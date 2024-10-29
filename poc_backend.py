@@ -8672,6 +8672,9 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
         data = data[data.apply(lambda row: row.count() > 4, axis=1)].reset_index(drop=True)
         print(data.head(10))
 
+        # Remove rows where any column contains 'Grand Total'
+        data = data[~data.apply(lambda row: row.astype(str).str.contains('Grand Total', case=False, na=False).any(), axis=1)].reset_index(drop=True)
+
         # Handle repeating header rows and split data into sections
         columns = data.columns.tolist()
         columns_cleaned = [str(col).strip().lower() for col in columns]  # Cleaned column names for comparison
@@ -8853,25 +8856,23 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
             else:
                 processed_df['P & L JV'] = ''
 
-            processed_df['P & L JV'] = processed_df.apply(
-                lambda row: '' if row['Endorsement No.'] == '' else 'Endorsement', axis=1
-            )
-            # Branch lookup
-
+            # Update 'Endorsement No.' and 'P & L JV' based on 'Policy No.'
             if 'Endorsement No.' in processed_df.columns:
                 def process_endorsement(row):
-                    endorsement_no = str(row['Endorsement No.']).strip()
-                    p_l_jv = str(row.get('P & L JV', '')).strip()
-                    if endorsement_no == '0':
-                        row['Endorsement No.'] = ''
-                        row['P & L JV'] = ''
-                    else:
-                        if row['Endorsement No.'] != '':
+                    policy_no = str(row['Policy No.']).strip()
+                    if '-' in policy_no:
+                        parts = policy_no.split('-')
+                        last_part = parts[-1]
+                        if last_part.startswith('E'):
+                            row['Endorsement No.'] = last_part
                             row['P & L JV'] = 'Endorsement'
                         else:
+                            row['Endorsement No.'] = ''
                             row['P & L JV'] = ''
+                    else:
+                        row['Endorsement No.'] = ''
+                        row['P & L JV'] = ''
                     return row
-
                 processed_df = processed_df.apply(process_endorsement, axis=1)
             else:
                 pass
@@ -9176,10 +9177,8 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
 
 
 
-
-
 def process_hdfc_ergo_insurance(file_path, template_data, risk_code_data, cust_neft_data,
-                                    table_3, table_4, table_5, subject, mappings):
+                                table_3, table_4, table_5, subject, mappings):
     try:
         # Read the file based on its extension, including xlsb files
         file_extension = os.path.splitext(file_path)[1].lower()
@@ -9204,6 +9203,9 @@ def process_hdfc_ergo_insurance(file_path, template_data, risk_code_data, cust_n
         data = data.dropna(how='all').reset_index(drop=True)
         data = data[data.apply(lambda row: row.count() > 4, axis=1)].reset_index(drop=True)
         print(data.head(10))
+
+        # Remove rows where any column contains 'Grand Total'
+        data = data[~data.apply(lambda row: row.astype(str).str.contains('Grand Total', case=False, na=False).any(), axis=1)].reset_index(drop=True)
 
         # Handle repeating header rows and split data into sections
         columns = data.columns.tolist()
@@ -9302,6 +9304,10 @@ def process_hdfc_ergo_insurance(file_path, template_data, risk_code_data, cust_n
                 processed_df = processed_df.drop(columns=cols_to_drop, errors='ignore')
             # ---- Data Expansion Logic Ends Here ----
 
+            # Replace blank values in 'Premium' column with 'No value found'
+            if 'Premium' in processed_df.columns:
+                processed_df['Premium'] = processed_df['Premium'].apply(lambda x: 'No value found' if pd.isnull(x) or x == '' else x)
+
             processed_df['Income category'] = processed_df['P & L JV']
 
             # ---- New Logic Starts Here ----
@@ -9345,6 +9351,8 @@ def process_hdfc_ergo_insurance(file_path, template_data, risk_code_data, cust_n
                     try:
                         brokerage = float(str(row['Brokerage']).replace(',', '').replace('(', '').replace(')', ''))
                         premium = float(str(row['Premium']).replace(',', '').replace('(', '').replace(')', ''))
+                        if isinstance(premium, str) and premium.lower() == 'no value found':
+                            return 0
                         if premium != 0:
                             return round((brokerage / premium) * 100, 2)
                         else:
@@ -9706,7 +9714,3 @@ def process_hdfc_ergo_insurance(file_path, template_data, risk_code_data, cust_n
     except Exception as e:
         print(f"Error processing Hdfc Ergo insurance: {str(e)}")
         raise
-
-
-
-
