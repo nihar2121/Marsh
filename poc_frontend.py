@@ -826,7 +826,8 @@ def select_insurer():
                 'Terror commision': 'Premium3',
                 'reward': 'Brokerage1',
                 'TP_commission': 'Brokerage2',
-                'Terrorism AMOUNT': 'Brokerage3'
+                'Terrorism AMOUNT': 'Brokerage3',
+                'MASTER_POLICY_NO': 'ASP Practice'
 
                                                         }
 
