@@ -932,8 +932,14 @@ def edit_mappings():
         return jsonify({'message': 'No valid file attachment found.'}), 400
 
     # Extract column names from the file
+    # Extract column names from the file
     all_columns = [str(col).strip() for col in file_df.columns.tolist() if not str(col).startswith('Unnamed')]
-    all_columns.append('blank')  # Add 'blank' as an option
+    all_columns.append('blank')
+    all_columns.append('blank1')
+    all_columns.append('blank2')
+    all_columns.append('blank3')
+    all_columns.append('blank4')
+    all_columns.append('blank5')
 
     if request.method == 'POST':
         # Build the mappings in the format:
