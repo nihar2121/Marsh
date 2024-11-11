@@ -8718,6 +8718,34 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
             else:
                 mapped_df = section.copy()  # Proceed without mappings if not provided
 
+            # ---- New Logic: Update 'Client Name' based on 'ASP Practice' using 'state_lookups.xlsx' 'Sheet5' ----
+            if 'ASP Practice' in mapped_df.columns:
+                state_lookups_sheet5 = pd.read_excel(
+                    r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
+                    r'\Common folder AP & AR\Brokerage Statement Automation\support files'
+                    r'\state_lookups.xlsx',
+                    sheet_name='Sheet5',
+                )
+                # Clean column names
+                state_lookups_sheet5.columns = state_lookups_sheet5.columns.str.strip()
+                # Ensure 'ASP Practice' and 'MASTER_POLICY_NO' are strings
+                mapped_df['ASP Practice'] = mapped_df['ASP Practice'].astype(str).str.strip()
+                state_lookups_sheet5['MASTER_POLICY_NO'] = state_lookups_sheet5['MASTER_POLICY_NO'].astype(str).str.strip()
+                # Merge on 'ASP Practice' and 'MASTER_POLICY_NO'
+                mapped_df = mapped_df.merge(
+                    state_lookups_sheet5[['MASTER_POLICY_NO', 'Client Name']],
+                    how='left',
+                    left_on='ASP Practice',
+                    right_on='MASTER_POLICY_NO'
+                )
+                # Update 'Client Name' where match is found
+                mapped_df['Client Name'] = mapped_df['Client Name_y'].combine_first(mapped_df['Client Name_x'])
+                # Drop the extra columns
+                mapped_df = mapped_df.drop(columns=['MASTER_POLICY_NO', 'Client Name_x', 'Client Name_y'])
+            else:
+                pass  # If 'ASP Practice' not in columns, do nothing
+            # ---- New Logic Ends Here ----
+
             # ---- Data Expansion Logic Starts Here ----
             # Create separate DataFrames for Brokerage1/Premium1, Brokerage2/Premium2, Brokerage3/Premium3
             df_list = []
