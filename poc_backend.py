@@ -10558,7 +10558,7 @@ def process_bajaj_allianz_life_insurance(file_path, template_data, risk_code_dat
 
             # Set 'Entry No.' and other columns
             processed_df['Entry No.'] = range(1, len(processed_df) + 1)
-            processed_df['Debtor Name'] = 'Bajaj Allianz Life INsurance Company Limited'
+            processed_df['Debtor Name'] = 'Bajaj Allianz Life Insurance Company Limited'
             processed_df['AccountType'] = "Customer"
             processed_df['AccountTypeDuplicate'] = processed_df['AccountType']
             processed_df['Nature of Transaction'] = "Brokerage Statement"
