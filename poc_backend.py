@@ -9715,19 +9715,6 @@ def process_hdfc_ergo_insurance(file_path, template_data, risk_code_data, cust_n
         print(f"Error processing Hdfc Ergo insurance: {str(e)}")
         raise
 
-import os
-import pandas as pd
-import numpy as np
-from datetime import datetime
-
-def parse_date_flexible(date_str):
-    for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%m/%d/%Y', '%d-%b-%Y'):
-        try:
-            return datetime.strptime(date_str, fmt)
-        except (ValueError, TypeError):
-            continue
-    return pd.NaT
-
 def process_relaince_general_insurance_co(file_path, template_data, risk_code_data, cust_neft_data,
                                          table_3, table_4, table_5, subject, mappings):
     try:
@@ -9870,7 +9857,7 @@ def process_relaince_general_insurance_co(file_path, template_data, risk_code_da
             # Make 'Endorsement No.' blank if it contains '00' or '0' and set 'P & L JV' accordingly
             if 'Endorsement No.' in processed_df.columns:
                 processed_df['Endorsement No.'] = processed_df['Endorsement No.'].apply(
-                    lambda x: '' if str(x).strip() in ['00', '0'] else x
+                    lambda x: '' if str(x).strip() in ['00', '0', '0.00', '0.0'] else x
                 )
                 # Set 'P & L JV' based on 'Endorsement No.'
                 processed_df['P & L JV'] = processed_df['Endorsement No.'].apply(
