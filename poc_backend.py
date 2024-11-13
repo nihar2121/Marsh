@@ -9743,22 +9743,6 @@ def process_hdfc_ergo_insurance(file_path, template_data, risk_code_data, cust_n
         print(f"Error processing Hdfc Ergo insurance: {str(e)}")
         raise
 
-import os
-import pandas as pd
-import numpy as np
-from datetime import datetime
-
-def parse_date_flexible(date_str):
-    """
-    A helper function to parse dates flexibly.
-    Modify this function based on your date formats.
-    """
-    for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d", "%m/%d/%Y"):
-        try:
-            return datetime.strptime(date_str, fmt)
-        except ValueError:
-            continue
-    return None
 
 def process_relaince_general_insurance_co(file_path, template_data, risk_code_data, cust_neft_data,
                                          table_3, table_4, table_5, subject, mappings):
@@ -10042,7 +10026,7 @@ def process_relaince_general_insurance_co(file_path, template_data, risk_code_da
 
             # Set 'Entry No.' and other columns
             processed_df['Entry No.'] = range(1, len(processed_df) + 1)
-            processed_df['Debtor Name'] = 'Hdfc Ergo General Insurance Company Limited'
+            processed_df['Debtor Name'] = 'Reliance General Insurance Co. Ltd.'
             processed_df['AccountType'] = "Customer"
             processed_df['AccountTypeDuplicate'] = processed_df['AccountType']
             processed_df['Nature of Transaction'] = "Brokerage Statement"
@@ -10280,7 +10264,7 @@ def process_relaince_general_insurance_co(file_path, template_data, risk_code_da
         # Define output directories
         base_dir = (
             r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
-            r'\Common folder AP & AR\Brokerage Statement Automation\Hdfc Ergo Insurance Template Files'
+            r'\Common folder AP & AR\Brokerage Statement Automation\Relaince General Insurance Template Files'
         )
         excel_dir = os.path.join(base_dir, 'excel_file')
         csv_dir = os.path.join(base_dir, 'csv_file')
@@ -10303,6 +10287,6 @@ def process_relaince_general_insurance_co(file_path, template_data, risk_code_da
         return final_processed_df, excel_file_path
 
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(f"Error processing Relaince General insurance: {str(e)}")
         raise
 
