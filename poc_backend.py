@@ -11567,6 +11567,21 @@ def process_magma_hdi_general_insurance_company(file_path, template_data, risk_c
                 # Add terrorism and additional rows as per standard processing
                 add_additional_rows = True
             # ---- Terrorism Premium Handling Ends Here ----
+            processed_df['Entry No.'] = range(1, len(processed_df) + 1)
+            processed_df['Debtor Name'] = 'Bajaj Allianz Life Insurance Company Limited'
+            processed_df['AccountType'] = "Customer"
+            processed_df['AccountTypeDuplicate'] = processed_df['AccountType']
+            processed_df['Nature of Transaction'] = "Brokerage Statement"
+            processed_df['TDS Ledger'] = processed_df['Debtor Name']
+            processed_df['RepDate'] = datetime.today().strftime('%d-%b-%y')
+            processed_df['NPT2'] = subject.replace('FW:', '').replace('RE:', '').strip()
+            processed_df['Debtor Branch Ref'] = ''
+            processed_df['ASP Practice'] = processed_df.get('ASP Practice', '')
+            processed_df['NPT'] = ''
+            processed_df['Bank Ledger'] = ''
+            processed_df['Service Tax Ledger'] = ''
+            processed_df['Narration'] = ''
+            processed_df['Policy Type'] = ''
 
             # ---- Additional Rows Processing Starts Here ----
             # Only add additional rows if required
