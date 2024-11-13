@@ -911,7 +911,7 @@ def select_insurer():
             read_tables_from_email(email_body, selected_insurer)  # Pass the selected insurer to the function
             default_mappings = {
                 'Product': 'Risk1',
-                'Product LOB': 'Risk2'
+                'Product LOB': 'Risk2',
                 'Policy No.': 'Policy No.',
                 'Insured Name': 'Client Name',
                 'End date': 'Policy End Date',
