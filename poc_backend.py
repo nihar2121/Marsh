@@ -11276,6 +11276,10 @@ def process_care_health_insurance_limited(file_path, template_data, risk_code_da
     except Exception as e:
         print(f"Error processing Care Health Insurance Limited: {str(e)}")
         raise
+import os
+import pandas as pd
+import numpy as np
+from datetime import datetime
 
 def process_magma_hdi_general_insurance_company(file_path, template_data, risk_code_data, cust_neft_data,
                                                 table_3, table_4, table_5, subject, mappings):
@@ -11540,7 +11544,8 @@ def process_magma_hdi_general_insurance_company(file_path, template_data, risk_c
             if 'Brokerage1' in mappings.values():
                 brokerage1_col = next((k for k, v in mappings.items() if v == 'Brokerage1'), None)
                 if brokerage1_col and brokerage1_col in section.columns:
-                    sum_brokerage1 = section[brokerage1_col].astype(str).str.replace(',', '').replace('(', '').replace(')', '').astype(float).sum()
+                    # Clean the Brokerage1 column by removing special characters
+                    sum_brokerage1 = section[brokerage1_col].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '').astype(float).sum()
                 else:
                     sum_brokerage1 = 0.0
             else:
@@ -11557,16 +11562,24 @@ def process_magma_hdi_general_insurance_company(file_path, template_data, risk_c
             else:
                 first_value_table3 = 0.0
 
+            # Debugging Statements
+            print(f"Section {idx + 1} - Sum of Brokerage1: {sum_brokerage1}")
+            print(f"Section {idx + 1} - First value in table_3: {first_value_table3}")
+
             # Check if sum_brokerage1 matches the first value in table_3
             brokerage_matches = np.isclose(sum_brokerage1, first_value_table3, atol=0.01)
+            print(f"Section {idx + 1} - Brokerage matches: {brokerage_matches}")
 
             if brokerage_matches:
                 # Do not add terrorism and additional rows; proceed normally
                 add_additional_rows = False
+                print(f"Section {idx + 1}: Brokerage matches. Skipping additional rows.")
             else:
                 # Add terrorism and additional rows as per standard processing
                 add_additional_rows = True
+                print(f"Section {idx + 1}: Brokerage does not match. Adding additional rows.")
             # ---- Terrorism Premium Handling Ends Here ----
+
             processed_df['Entry No.'] = range(1, len(processed_df) + 1)
             processed_df['Debtor Name'] = 'Bajaj Allianz Life Insurance Company Limited'
             processed_df['AccountType'] = "Customer"
