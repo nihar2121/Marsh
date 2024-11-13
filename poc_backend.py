@@ -9715,6 +9715,18 @@ def process_hdfc_ergo_insurance(file_path, template_data, risk_code_data, cust_n
         print(f"Error processing Hdfc Ergo insurance: {str(e)}")
         raise
 
+import os
+import pandas as pd
+import numpy as np
+from datetime import datetime
+
+def parse_date_flexible(date_str):
+    for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%m/%d/%Y', '%d-%b-%Y'):
+        try:
+            return datetime.strptime(date_str, fmt)
+        except (ValueError, TypeError):
+            continue
+    return pd.NaT
 
 def process_relaince_general_insurance_co(file_path, template_data, risk_code_data, cust_neft_data,
                                          table_3, table_4, table_5, subject, mappings):
@@ -9847,25 +9859,7 @@ def process_relaince_general_insurance_co(file_path, template_data, risk_code_da
             if 'Premium' in processed_df.columns:
                 processed_df['Premium'] = processed_df['Premium'].apply(lambda x: 'No value found' if pd.isnull(x) or x == '' else x)
 
-            processed_df['Income category'] = processed_df['P & L JV']
-
-            # ---- New Logic Starts Here ----
-            # Modify Risk processing for Reliance General Insurance
-            # Lookup Risk using risk_code_data passed as a parameter
-            # Assume risk_code_data has columns 'Risk code' and 'Risk name' starting from the second row
-            if 'Risk' in processed_df.columns:
-                # Clean risk_code_data
-                risk_code_data_cleaned = risk_code_data.dropna().reset_index(drop=True)
-                risk_code_data_cleaned.columns = risk_code_data_cleaned.iloc[1]  # Take second row as header
-                risk_code_data_cleaned = risk_code_data_cleaned.drop(index=0).reset_index(drop=True)
-                risk_code_mapping = pd.Series(risk_code_data_cleaned['Risk name'].values, index=risk_code_data_cleaned['Risk code'].astype(str).str.strip()).to_dict()
-
-                # Ensure 'Risk' is string and stripped
-                processed_df['Risk'] = processed_df['Risk'].astype(str).str.strip()
-
-                # Map 'Risk' using the risk_code_mapping
-                processed_df['Risk'] = processed_df['Risk'].map(risk_code_mapping).fillna(processed_df['Risk'])
-            # ---- New Logic Ends Here ----
+            # ---- Move 'P & L JV' assignment after 'Endorsement No.' processing ----
 
             # ---- Policy No and Endorsement No Processing Starts Here ----
             # Replace single quotes in 'Policy No' and 'Endorsement No'
@@ -9873,7 +9867,7 @@ def process_relaince_general_insurance_co(file_path, template_data, risk_code_da
                 if col in processed_df.columns:
                     processed_df[col] = processed_df[col].astype(str).str.replace("’", "'", regex=False).str.replace("‘", "'", regex=False)
 
-            # Make 'Endorsement No.' blank if it contains '00' or '0'
+            # Make 'Endorsement No.' blank if it contains '00' or '0' and set 'P & L JV' accordingly
             if 'Endorsement No.' in processed_df.columns:
                 processed_df['Endorsement No.'] = processed_df['Endorsement No.'].apply(
                     lambda x: '' if str(x).strip() in ['00', '0'] else x
@@ -9882,7 +9876,13 @@ def process_relaince_general_insurance_co(file_path, template_data, risk_code_da
                 processed_df['P & L JV'] = processed_df['Endorsement No.'].apply(
                     lambda x: 'Endorsement' if pd.notna(x) and str(x).strip() != '' else ''
                 )
+            else:
+                processed_df['P & L JV'] = ''
+
             # ---- Policy No and Endorsement No Processing Ends Here ----
+
+            # Remove empty rows and reset index if necessary
+            processed_df = processed_df.dropna(how='all').reset_index(drop=True)
 
             # Handle dates in 'Policy Start Date' and 'Policy End Date' columns after mappings
             date_columns = ['Policy Start Date', 'Policy End Date']
@@ -9897,9 +9897,10 @@ def process_relaince_general_insurance_co(file_path, template_data, risk_code_da
                 def calc_brokerage_rate(row):
                     try:
                         brokerage = float(str(row['Brokerage']).replace(',', '').replace('(', '').replace(')', ''))
-                        premium = float(str(row['Premium']).replace(',', '').replace('(', '').replace(')', ''))
-                        if isinstance(premium, str) and premium.lower() == 'no value found':
+                        premium_val = str(row['Premium']).replace(',', '').replace('(', '').replace(')', '')
+                        if premium_val.lower() == 'no value found':
                             return 0
+                        premium = float(premium_val)
                         if premium != 0:
                             return round((brokerage / premium) * 100, 2)
                         else:
@@ -9929,7 +9930,10 @@ def process_relaince_general_insurance_co(file_path, template_data, risk_code_da
                     .str.strip()
                 )
                 processed_df['P & L JV'] = (
-                    processed_df['P & L JV'].astype(str).str.strip().str.lower()
+                    processed_df['P & L JV']
+                    .astype(str)
+                    .str.strip()
+                    .str.lower()
                 )
                 endorsement_lookup = (
                     endorsement_type_mapping.set_index('Endorsement Type')['lookup value']
@@ -9940,29 +9944,6 @@ def process_relaince_general_insurance_co(file_path, template_data, risk_code_da
                 ).fillna('')
             else:
                 processed_df['P & L JV'] = ''
-
-            processed_df['P & L JV'] = processed_df.apply(
-                lambda row: '' if row['Endorsement No.'] == '' else 'Endorsement', axis=1
-            )
-            # Branch lookup
-
-            if 'Endorsement No.' in processed_df.columns:
-                def process_endorsement(row):
-                    endorsement_no = str(row['Endorsement No.']).strip()
-                    p_l_jv = str(row.get('P & L JV', '')).strip()
-                    if endorsement_no == '0':
-                        row['Endorsement No.'] = ''
-                        row['P & L JV'] = ''
-                    else:
-                        if row['Endorsement No.'] != '':
-                            row['P & L JV'] = 'Endorsement'
-                        else:
-                            row['P & L JV'] = ''
-                    return row
-
-                processed_df = processed_df.apply(process_endorsement, axis=1)
-            else:
-                pass
 
             # Income category lookup
             if 'Income category' in processed_df.columns:
@@ -10067,7 +10048,10 @@ def process_relaince_general_insurance_co(file_path, template_data, risk_code_da
             processed_df['Debtor Name'] = insurer_name
 
             # Convert date to dd/mm/yyyy format
-            date_col_formatted = pd.to_datetime(date_col).strftime('%d/%m/%Y')
+            try:
+                date_col_formatted = pd.to_datetime(date_col).strftime('%d/%m/%Y')
+            except:
+                date_col_formatted = ''
 
             # Get 'supplier_name_col' from 'table_4'
             supplier_name_col = ''
@@ -10126,67 +10110,67 @@ def process_relaince_general_insurance_co(file_path, template_data, risk_code_da
                 first_new_row_brokerage = gst_amount
                 # Create additional rows
                 new_rows = pd.DataFrame({
-                    'Entry No.': '',
-                    'Debtor Name': processed_df['Debtor Name'].iloc[0],
+                    'Entry No.': [''] * 2,
+                    'Debtor Name': [processed_df['Debtor Name'].iloc[0]] * 2,
                     'Nature of Transaction': ["GST Receipts", "Brokerage Statement"],
-                    'AccountType': processed_df['AccountType'].iloc[0],
-                    'Debtor Branch Ref': processed_df['Debtor Branch Ref'].iloc[0],
+                    'AccountType': [processed_df['AccountType'].iloc[0]] * 2,
+                    'Debtor Branch Ref': [processed_df['Debtor Branch Ref'].iloc[0]] * 2,
                     'Client Name': ["GST @ 18%", "TDS Receivable - AY 2025-26"],
-                    'Policy No.': '',
-                    'Risk': '',
+                    'Policy No.': [''] * 2,
+                    'Risk': [''] * 2,
                     'Endorsement No.': ["", ""],
-                    'Policy Type': '',
-                    'Policy Start Date': '',
-                    'Policy End Date': '',
-                    'Premium': '0.00',
-                    'Brokerage Rate': '',
+                    'Policy Type': [''] * 2,
+                    'Policy Start Date': [''] * 2,
+                    'Policy End Date': [''] * 2,
+                    'Premium': ['0.00'] * 2,
+                    'Brokerage Rate': ['', ''],
                     'Brokerage': [f"{first_new_row_brokerage:.2f}", f"{third_new_row_brokerage:.2f}"],
-                    'Narration': narration,
-                    'NPT': '',
-                    'Bank Ledger': bank_ledger_value,
+                    'Narration': [narration, narration],
+                    'NPT': ['', ''],
+                    'Bank Ledger': [bank_ledger_value] * 2,
                     'AccountTypeDuplicate': [processed_df['AccountTypeDuplicate'].iloc[0], 'G/L Account'],
                     'Service Tax Ledger': [
                         processed_df['Service Tax Ledger'].iloc[0],
                         '2300022'
                     ],
-                    'TDS Ledger': [processed_df['TDS Ledger'].iloc[0], 'TDS Receivable - AY 2025-26'],
-                    'RepDate': processed_df['RepDate'].iloc[-1],
-                    'Branch': '',
+                    'TDS Ledger': ['TDS Receivable - AY 2025-26'] * 2,
+                    'RepDate': [processed_df['RepDate'].iloc[-1]] * 2,
+                    'Branch': ['', ''],
                     'Income category': ['', ''],
-                    'ASP Practice': processed_df['ASP Practice'].iloc[-1],
+                    'ASP Practice': [processed_df['ASP Practice'].iloc[-1]] * 2,
                     'P & L JV': [invoice_nos, invoice_nos],
-                    'NPT2': processed_df['NPT2'].iloc[-1]
+                    'NPT2': [processed_df['NPT2'].iloc[-1]] * 2
                 })
             else:
                 # Create additional row
                 new_rows = pd.DataFrame({
-                    'Entry No.': '',
-                    'Debtor Name': processed_df['Debtor Name'].iloc[0],
+                    'Entry No.': [''],
+                    'Debtor Name': [processed_df['Debtor Name'].iloc[0]],
                     'Nature of Transaction': ["Brokerage Statement"],
-                    'AccountType': processed_df['AccountType'].iloc[0],
-                    'Debtor Branch Ref': processed_df['Debtor Branch Ref'].iloc[0],
+                    'AccountType': [processed_df['AccountType'].iloc[0]],
+                    'Debtor Branch Ref': [processed_df['Debtor Branch Ref'].iloc[0]],
                     'Client Name': ["TDS Receivable - AY 2025-26"],
-                    'Policy No.': '',
-                    'Risk': '',
+                    'Policy No.': [''],
+                    'Risk': [''],
                     'Endorsement No.': [""],
-                    'Policy Type': '',
-                    'Policy Start Date': '',
-                    'Policy End Date': '',
-                    'Premium': '0.00',
-                    'Brokerage Rate': '',
+                    'Policy Type': [''],
+                    'Policy Start Date': [''],
+                    'Policy End Date': [''],
+                    'Premium': ['0.00'],
+                    'Brokerage Rate': [''],
                     'Brokerage': [f"{third_new_row_brokerage:.2f}"],
-                    'Narration': narration,
-                    'NPT': '',
-                    'Bank Ledger': bank_ledger_value,
+                    'Narration': [narration],
+                    'NPT': [''],
+                    'Bank Ledger': [bank_ledger_value],
                     'AccountTypeDuplicate': ['G/L Account'],
                     'Service Tax Ledger': ['2300022'],
                     'TDS Ledger': ['TDS Receivable - AY 2025-26'],
-                    'RepDate': processed_df['RepDate'].iloc[-1],
-                    'Branch': '',
+                    'RepDate': [processed_df['RepDate'].iloc[-1]],
+                    'Branch': [''],
                     'Income category': [''],
                     'ASP Practice': [processed_df['ASP Practice'].iloc[-1]],
                     'P & L JV': [invoice_nos],
-                    'NPT2': processed_df['NPT2'].iloc[-1]
+                    'NPT2': [processed_df['NPT2'].iloc[-1]]
                 })
 
             # Concatenate new_rows to processed_df
@@ -10261,7 +10245,6 @@ def process_relaince_general_insurance_co(file_path, template_data, risk_code_da
     except Exception as e:
         print(f"Error processing Relaince General insurance: {str(e)}")
         raise
-
 
 
 def process_bajaj_allianz_life_insurance(file_path, template_data, risk_code_data, cust_neft_data,
