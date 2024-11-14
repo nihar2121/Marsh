@@ -11280,7 +11280,6 @@ import os
 import pandas as pd
 import numpy as np
 from datetime import datetime
-
 def process_magma_hdi_general_insurance_company(file_path, template_data, risk_code_data, cust_neft_data,
                                                 table_3, table_4, table_5, subject, mappings):
     try:
@@ -11478,9 +11477,16 @@ def process_magma_hdi_general_insurance_company(file_path, template_data, risk_c
                         endorsement_type_mapping.set_index('Endorsement Type')['lookup value']
                         .to_dict()
                     )
+                    print("Performing 'P & L JV' lookup:")
+                    print("Unique values in 'P & L JV' before mapping:")
+                    print(processed_df['P & L JV'].unique())
+                    print("Keys in 'P & L JV' mapping dictionary:")
+                    print(list(endorsement_lookup.keys()))
                     processed_df['P & L JV'] = processed_df['P & L JV'].map(
                         endorsement_lookup
                     ).fillna('')
+                    print("Unique values in 'P & L JV' after mapping:")
+                    print(processed_df['P & L JV'].unique())
                 
                 # Lookup 'Income category'
                 if 'Income category' in processed_df.columns:
@@ -11508,15 +11514,49 @@ def process_magma_hdi_general_insurance_company(file_path, template_data, risk_c
                     income_category_lookup = (
                         state_lookups_sheet4.set_index('BUSINESS_TYPE')['lookups'].to_dict()
                     )
+                    print("Performing 'Income category' lookup:")
+                    print("Unique values in 'Income category' before mapping:")
+                    print(processed_df['Income category'].unique())
+                    print("Keys in 'Income category' mapping dictionary:")
+                    print(list(income_category_lookup.keys()))
                     processed_df['Income category'] = processed_df['Income category'].map(
                         income_category_lookup
                     ).fillna('')
+                    print("Unique values in 'Income category' after mapping:")
+                    print(processed_df['Income category'].unique())
             else:
                 # Initialize columns if they don't exist
                 if 'P & L JV' not in processed_df.columns:
                     processed_df['P & L JV'] = ''
+                    print("P & L JV column not found")
+
                 if 'Income category' not in processed_df.columns:
                     processed_df['Income category'] = ''
+                    print("Income category column not found")
+            #Branch Lookup
+            if 'Branch' in processed_df.columns:
+                state_lookups_sheet2 = pd.read_excel(
+                    r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
+                    r'\Common folder AP & AR\Brokerage Statement Automation\support files'
+                    r'\state_lookups.xlsx',
+                    sheet_name='Sheet2',
+                )
+                state_lookups_sheet2['state'] = (
+                    state_lookups_sheet2['state'].astype(str).str.strip().str.lower()
+                )
+                state_lookups_sheet2['shortform'] = (
+                    state_lookups_sheet2['shortform'].astype(str).str.strip()
+                )
+                processed_df['Branch'] = (
+                    processed_df['Branch'].astype(str).str.strip().str.lower()
+                )
+                branch_lookup = state_lookups_sheet2.set_index('state')[
+                    'shortform'
+                ].to_dict()
+                processed_df['Branch'] = processed_df['Branch'].map(branch_lookup).fillna('')
+            else:
+                processed_df['Branch'] = ''
+
 
             # ---- Endorsement No. Processing Starts Here ----
             # Make 'P & L JV' blank if 'Endorsement No.' is 0, 0.0, '00', or '0.00'
@@ -11551,23 +11591,41 @@ def process_magma_hdi_general_insurance_company(file_path, template_data, risk_c
             else:
                 sum_brokerage1 = processed_df['Brokerage'].astype(float).sum()
 
-            # Get the total or first column from table_3 for comparison
+            # Get the 'TotalTaxAmt' or 'Total' column from table_3 for comparison
             if not table_3.empty:
-                total_column = table_3.columns[-1]
-                first_value_table3 = table_3.iloc[0, -1]
-                try:
-                    first_value_table3 = float(str(first_value_table3).replace(',', '').replace('(', '').replace(')', ''))
-                except:
-                    first_value_table3 = 0.0
+                total_value = None
+                for col_name in ['TotalTaxAmt', 'Total']:
+                    matching_cols = [col for col in table_3.columns if col_name.lower() in col.lower()]
+                    if matching_cols:
+                        total_col = matching_cols[0]
+                        total_value_str = table_3[total_col].iloc[0]
+                        try:
+                            total_value = float(str(total_value_str).replace(',', '').replace('(', '').replace(')', ''))
+                            print(f"Found total value in column '{total_col}': {total_value}")
+                            break  # Exit loop once we have found and processed the column
+                        except:
+                            total_value = 0.0
+                            print(f"Could not convert total value in column '{total_col}'")
+                            break  # Even if conversion fails, exit loop
+
+                if total_value is None:
+                    # If 'TotalTaxAmt' or 'Total' columns not found, use value in first column first row
+                    total_value_str = table_3.iloc[0, 0]
+                    try:
+                        total_value = float(str(total_value_str).replace(',', '').replace('(', '').replace(')', ''))
+                        print(f"Using first value in first column of table_3: {total_value}")
+                    except:
+                        total_value = 0.0
+                        print("Could not convert first value in first column of table_3")
             else:
-                first_value_table3 = 0.0
+                total_value = 0.0
 
             # Debugging Statements
             print(f"Section {idx + 1} - Sum of Brokerage1: {sum_brokerage1}")
-            print(f"Section {idx + 1} - First value in table_3: {first_value_table3}")
+            print(f"Section {idx + 1} - Total value from table_3: {total_value}")
 
-            # Check if sum_brokerage1 matches the first value in table_3
-            brokerage_matches = np.isclose(sum_brokerage1, first_value_table3, atol=0.01)
+            # Check if sum_brokerage1 matches the total_value
+            brokerage_matches = np.isclose(sum_brokerage1, total_value, atol=0.01)
             print(f"Section {idx + 1} - Brokerage matches: {brokerage_matches}")
 
             if brokerage_matches:
