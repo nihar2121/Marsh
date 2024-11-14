@@ -11276,10 +11276,8 @@ def process_care_health_insurance_limited(file_path, template_data, risk_code_da
     except Exception as e:
         print(f"Error processing Care Health Insurance Limited: {str(e)}")
         raise
-import os
-import pandas as pd
-import numpy as np
-from datetime import datetime
+
+
 def process_magma_hdi_general_insurance_company(file_path, template_data, risk_code_data, cust_neft_data,
                                                 table_3, table_4, table_5, subject, mappings):
     try:
@@ -11351,7 +11349,7 @@ def process_magma_hdi_general_insurance_company(file_path, template_data, risk_c
                     else:
                         mapped_df[template_col] = ''
                 
-                # Handle 'Income category' and 'P & L JV' mappings
+                # Copy 'Income category' to 'P & L JV' and vice versa
                 if 'Income category' in mappings.values():
                     income_category_col = next((k for k, v in mappings.items() if v == 'Income category'), None)
                     if income_category_col and income_category_col in mapped_df.columns:
@@ -11445,8 +11443,10 @@ def process_magma_hdi_general_insurance_company(file_path, template_data, risk_c
                 processed_df['Brokerage Rate'] = processed_df['Brokerage Rate'].apply(lambda x: "{0:.2f}".format(x))
 
             # For 'P & L JV' and 'Income category' lookup
-            # Perform lookups only if mappings were not used to copy columns
+            # Copy 'Income category' and 'P & L JV' to each other
             if 'Income category' in processed_df.columns and 'P & L JV' in processed_df.columns:
+                processed_df['P & L JV'] = processed_df['Income category']
+                processed_df['Income category'] = processed_df['P & L JV']
                 # Perform lookups
                 # Lookup 'P & L JV'
                 if 'P & L JV' in processed_df.columns:
@@ -11487,43 +11487,8 @@ def process_magma_hdi_general_insurance_company(file_path, template_data, risk_c
                     ).fillna('')
                     print("Unique values in 'P & L JV' after mapping:")
                     print(processed_df['P & L JV'].unique())
-                
-                # Lookup 'Income category'
-                if 'Income category' in processed_df.columns:
-                    state_lookups_sheet4 = pd.read_excel(
-                        r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
-                        r'\Common folder AP & AR\Brokerage Statement Automation\support files'
-                        r'\state_lookups.xlsx',
-                        sheet_name='Sheet4',
-                    )
-                    state_lookups_sheet4['BUSINESS_TYPE'] = (
-                        state_lookups_sheet4['BUSINESS_TYPE']
-                        .astype(str)
-                        .str.strip()
-                        .str.lower()
-                    )
-                    state_lookups_sheet4['lookups'] = (
-                        state_lookups_sheet4['lookups'].astype(str).str.strip()
-                    )
-                    processed_df['Income category'] = (
-                        processed_df['Income category']
-                        .astype(str)
-                        .str.strip()
-                        .str.lower()
-                    )
-                    income_category_lookup = (
-                        state_lookups_sheet4.set_index('BUSINESS_TYPE')['lookups'].to_dict()
-                    )
-                    print("Performing 'Income category' lookup:")
-                    print("Unique values in 'Income category' before mapping:")
-                    print(processed_df['Income category'].unique())
-                    print("Keys in 'Income category' mapping dictionary:")
-                    print(list(income_category_lookup.keys()))
-                    processed_df['Income category'] = processed_df['Income category'].map(
-                        income_category_lookup
-                    ).fillna('')
-                    print("Unique values in 'Income category' after mapping:")
-                    print(processed_df['Income category'].unique())
+                    # Copy back to 'Income category'
+                    processed_df['Income category'] = processed_df['P & L JV']
             else:
                 # Initialize columns if they don't exist
                 if 'P & L JV' not in processed_df.columns:
@@ -11565,16 +11530,12 @@ def process_magma_hdi_general_insurance_company(file_path, template_data, risk_c
                     lambda x: '' if str(x).strip() in ['0', '0.0', '00', '0.00'] else x
                 )
                 # Set 'P & L JV' based on 'Endorsement No.'
-                processed_df['P & L JV'] = processed_df['Endorsement No.'].apply(
-                    lambda x: 'Endorsement' if pd.notna(x) and str(x).strip() != '' else ''
-                )
+                # As per user's instruction, we should not add additional logic here
+                # So we will not modify 'P & L JV' here
             else:
                 processed_df['Endorsement No.'] = ''
-                processed_df['P & L JV'] = ''
 
             # ---- Endorsement No. Processing Ends Here ----
-
-            # Income category lookup is already handled above
 
             # Remove empty rows and reset index if necessary
             processed_df = processed_df.dropna(how='all').reset_index(drop=True)
@@ -11639,7 +11600,7 @@ def process_magma_hdi_general_insurance_company(file_path, template_data, risk_c
             # ---- Terrorism Premium Handling Ends Here ----
 
             processed_df['Entry No.'] = range(1, len(processed_df) + 1)
-            processed_df['Debtor Name'] = 'Magma Hdi General Insurance Company Limited'
+            processed_df['Debtor Name'] = 'Magma Hdi General Insurance Company Limited'  # Updated as per request
             processed_df['AccountType'] = "Customer"
             processed_df['AccountTypeDuplicate'] = processed_df['AccountType']
             processed_df['Nature of Transaction'] = "Brokerage Statement"
@@ -11828,6 +11789,13 @@ def process_magma_hdi_general_insurance_company(file_path, template_data, risk_c
 
                 # Concatenate new_rows to processed_df
                 processed_df = pd.concat([processed_df, new_rows], ignore_index=True)
+            else:
+                # Even if additional rows are not added, define 'safe_narration' to avoid error
+                narration_from_table_4 = ''
+                safe_narration = ''.join(e for e in narration_from_table_4 if e.isalnum() or e == ' ').strip()
+                # If 'safe_narration' is empty, use 'subject' or a default value
+                if not safe_narration:
+                    safe_narration = subject.replace(' ', '_')[:50]
             # ---- Additional Rows Processing Ends Here ----
 
             # Update 'Entry No.'
