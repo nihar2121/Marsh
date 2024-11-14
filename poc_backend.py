@@ -11639,7 +11639,7 @@ def process_magma_hdi_general_insurance_company(file_path, template_data, risk_c
             # ---- Terrorism Premium Handling Ends Here ----
 
             processed_df['Entry No.'] = range(1, len(processed_df) + 1)
-            processed_df['Debtor Name'] = 'Bajaj Allianz Life Insurance Company Limited'
+            processed_df['Debtor Name'] = 'Magma Hdi General Insurance Company Limited'
             processed_df['AccountType'] = "Customer"
             processed_df['AccountTypeDuplicate'] = processed_df['AccountType']
             processed_df['Nature of Transaction'] = "Brokerage Statement"
