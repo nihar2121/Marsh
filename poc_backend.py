@@ -6230,7 +6230,6 @@ def proess_acko_general_insurance(file_path, template_data, risk_code_data, cust
     except Exception as e:
         print(f"Error processing acko general insurance: {str(e)}")
         raise
-
 def process_sbi_general_insurance(file_path, template_data, risk_code_data, cust_neft_data,
                                       table_3, table_4, table_5, subject, mappings):
     try:
@@ -6251,10 +6250,12 @@ def process_sbi_general_insurance(file_path, template_data, risk_code_data, cust
         else:
             raise ValueError("Unsupported file format")
 
+        print("Initial Data:")
         print(data.head(10))
         # Remove empty rows to avoid empty dataframes
         data = data.dropna(how='all').reset_index(drop=True)
         data = data[data.apply(lambda row: row.count() > 4, axis=1)].reset_index(drop=True)
+        print("Data after removing empty rows:")
         print(data.head(10))
 
         # Handle repeating header rows and split data into sections
@@ -6285,6 +6286,7 @@ def process_sbi_general_insurance(file_path, template_data, risk_code_data, cust
         
         processed_sections = []
         for idx, section in enumerate(sections):
+            print(f"Processing section {idx + 1}:")
             # Clean column names and data
             section.columns = section.columns.str.strip()
             section = section.applymap(lambda x: x.strip() if isinstance(x, str) else x)
@@ -6299,6 +6301,15 @@ def process_sbi_general_insurance(file_path, template_data, risk_code_data, cust
                         processed_df[template_col] = ''
             else:
                 pass  # Proceed without mappings if not provided
+
+            # Ensure 'Endorsement No.' is treated as string to avoid scientific notation
+            if 'Endorsement No.' in processed_df.columns:
+                processed_df['Endorsement No.'] = processed_df['Endorsement No.'].astype(str).str.strip()
+                processed_df['Endorsement No.'] = processed_df['Endorsement No.'].replace('nan', '')
+                # Remove any .0 from numbers converted to strings
+                processed_df['Endorsement No.'] = processed_df['Endorsement No.'].str.replace(r'\.0$', '', regex=True)
+                print("Processed 'Endorsement No.' column:")
+                print(processed_df['Endorsement No.'])
 
             # Ensure numeric columns are handled correctly after mappings
             numeric_columns = ['Premium', 'Brokerage']
@@ -6365,9 +6376,20 @@ def process_sbi_general_insurance(file_path, template_data, risk_code_data, cust
             else:
                 processed_df['P & L JV'] = ''
         
+            # Ensure 'Endorsement No.' is cleaned
+            if 'Endorsement No.' in processed_df.columns:
+                processed_df['Endorsement No.'] = processed_df['Endorsement No.'].fillna('').astype(str).str.strip()
+                processed_df['Endorsement No.'] = processed_df['Endorsement No.'].replace('nan', '')
+                # Remove any .0 from numbers converted to strings
+                processed_df['Endorsement No.'] = processed_df['Endorsement No.'].str.replace(r'\.0$', '', regex=True)
+            
+            # Set 'P & L JV' based on 'Endorsement No.'
             processed_df['P & L JV'] = processed_df.apply(
                 lambda row: '' if row['Endorsement No.'] == '' else 'Endorsement', axis=1
             )
+            print("Processed 'P & L JV' column:")
+            print(processed_df[['Endorsement No.', 'P & L JV']])
+
             # Branch lookup
 
             if 'Branch' in processed_df.columns:
@@ -6685,6 +6707,7 @@ def process_sbi_general_insurance(file_path, template_data, risk_code_data, cust
     except Exception as e:
         print(f"Error processing sbi general insurance: {str(e)}")
         raise
+
 def process_godigit_general_insurance(file_path, template_data, risk_code_data, cust_neft_data,
                                       table_3, table_4, table_5, subject, mappings):
     try:
