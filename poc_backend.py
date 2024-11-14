@@ -11650,6 +11650,7 @@ def process_magma_hdi_general_insurance_company(file_path, template_data, risk_c
             processed_df['Service Tax Ledger'] = ''
             processed_df['Narration'] = ''
             processed_df['Policy Type'] = ''
+            processed_df['ASP Practice'] = ''
             print("Set default columns in processed data.")
 
             # Calculate sum of 'Brokerage'
