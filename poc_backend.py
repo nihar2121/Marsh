@@ -3914,7 +3914,6 @@ def process_universal_sampo_insurance(file_path, template_data, risk_code_data, 
     except Exception as e:
         print(f"Error processing Universal Sompo Insurance data: {str(e)}")
         raise
-
 def process_zuna_general_insurance(file_path, template_data, risk_code_data, cust_neft_data,
                                    table_3, table_4, table_5, subject, mappings):
     try:
@@ -3981,35 +3980,16 @@ def process_zuna_general_insurance(file_path, template_data, risk_code_data, cus
                 )
                 processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls
 
-        # P & L JV lookup
-        if 'ENDORSEMENT_TYPE' in data.columns:
-            endorsement_type_mapping = pd.read_excel(
-                r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
-                r'\Common folder AP & AR\Brokerage Statement Automation\support files'
-                r'\state_lookups.xlsx',
-                sheet_name='Sheet3',
+        # Update 'P & L JV' based on 'Endorsement No.'
+        if 'Endorsement No.' in processed_df.columns:
+            processed_df['Endorsement No.'] = processed_df['Endorsement No.'].astype(str).str.strip()
+            processed_df['Endorsement No.'] = processed_df['Endorsement No.'].replace('nan', '')
+            # Remove any .0 from numbers converted to strings
+            processed_df['Endorsement No.'] = processed_df['Endorsement No.'].str.replace(r'\.0$', '', regex=True)
+            # Set 'P & L JV' to 'Endorsement' if 'Endorsement No.' is not blank
+            processed_df['P & L JV'] = processed_df.apply(
+                lambda row: 'Endorsement' if row['Endorsement No.'] != '' else '', axis=1
             )
-            endorsement_type_mapping['Endorsement Type'] = (
-                endorsement_type_mapping['Endorsement Type']
-                .astype(str)
-                .str.strip()
-                .str.lower()
-            )
-            endorsement_type_mapping['lookup value'] = (
-                endorsement_type_mapping['lookup value']
-                .astype(str)
-                .str.strip()
-            )
-            data['ENDORSEMENT_TYPE'] = (
-                data['ENDORSEMENT_TYPE'].astype(str).str.strip().str.lower()
-            )
-            endorsement_lookup = (
-                endorsement_type_mapping.set_index('Endorsement Type')['lookup value']
-                .to_dict()
-            )
-            processed_df['P & L JV'] = data['ENDORSEMENT_TYPE'].map(
-                endorsement_lookup
-            ).fillna('')
         else:
             processed_df['P & L JV'] = ''
 
