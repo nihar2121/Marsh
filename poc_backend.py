@@ -11931,7 +11931,6 @@ def process_magma_hdi_general_insurance_company(file_path, template_data, risk_c
     except Exception as e:
         print(f"Error processing Magma Hdi General Insurance Company: {str(e)}")
         raise
-
 def process_generali_india_insurance_company(file_path, template_data, risk_code_data, cust_neft_data,
                                              table_3, table_4, table_5, subject, mappings):
     try:
@@ -12081,15 +12080,9 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
                 print("'Endorsement No.' not in processed data, setting 'P & L JV' to empty.")
 
             # Remove rows where both 'Premium' and 'Brokerage' are 0
-            if 'Premium' in processed_df.columns and 'Brokerage' in processed_df.columns:
-                processed_df[['Premium', 'Brokerage']] = processed_df[['Premium', 'Brokerage']].apply(pd.to_numeric, errors='coerce').fillna(0)
-                processed_df = processed_df[~((processed_df['Premium'] == 0) & (processed_df['Brokerage'] == 0))]
-                print("Removed rows where both 'Premium' and 'Brokerage' are 0.")
-            else:
-                print("'Premium' or 'Brokerage' column not in processed data.")
-
+            # We'll handle the 'Brokerage' column in the next steps
             # Ensure numeric columns are handled correctly after mappings
-            numeric_columns = ['Premium', 'Brokerage']
+            numeric_columns = ['Premium', 'Brokerage1', 'Brokerage2', 'Brokerage3']
             for column in numeric_columns:
                 if column in processed_df.columns:
                     processed_df[column] = processed_df[column].astype(str).str.replace(',', '').str.replace('(', '-').str.replace(')', '').str.strip()
@@ -12098,13 +12091,38 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
                 else:
                     print(f"Numeric column '{column}' not in processed data.")
 
+            # Combine 'Brokerage1', 'Brokerage2', 'Brokerage3' into 'Brokerage'
+            brokerage_cols = ['Brokerage1', 'Brokerage2', 'Brokerage3']
+            brokerage_cols_in_df = [col for col in brokerage_cols if col in processed_df.columns]
+            if brokerage_cols_in_df:
+                # If 'Brokerage2' and 'Brokerage3' are blank (zeros), use 'Brokerage1' as 'Brokerage'
+                processed_df['Brokerage'] = processed_df[brokerage_cols_in_df].sum(axis=1)
+                print("Combined 'Brokerage1', 'Brokerage2', 'Brokerage3' into 'Brokerage'")
+            else:
+                print("No 'Brokerage' columns found, setting 'Brokerage' to zero.")
+                processed_df['Brokerage'] = 0.0
+
+            # Similarly handle 'Premium' columns if there are multiple
+            premium_cols = ['Premium1', 'Premium2', 'Premium3']
+            premium_cols_in_df = [col for col in premium_cols if col in processed_df.columns]
+            if premium_cols_in_df:
+                processed_df['Premium'] = processed_df[premium_cols_in_df].sum(axis=1)
+                print("Combined 'Premium1', 'Premium2', 'Premium3' into 'Premium'")
+            else:
+                print("No 'Premium' columns found, setting 'Premium' to zero.")
+                processed_df['Premium'] = 0.0
+
+            # Now remove rows where both 'Premium' and 'Brokerage' are 0
+            processed_df = processed_df[~((processed_df['Premium'] == 0) & (processed_df['Brokerage'] == 0))]
+            print("Removed rows where both 'Premium' and 'Brokerage' are 0.")
+
             # Calculate 'Brokerage Rate' as (Brokerage / Premium) * 100, rounded to 2 decimals
             if 'Premium' in processed_df.columns and 'Brokerage' in processed_df.columns:
                 print("Calculating 'Brokerage Rate'")
                 def calc_brokerage_rate(row):
                     try:
-                        brokerage = float(str(row['Brokerage']).replace(',', '').replace('(', '-').replace(')', '').strip())
-                        premium = float(str(row['Premium']).replace(',', '').replace('(', '-').replace(')', '').strip())
+                        brokerage = row['Brokerage']
+                        premium = row['Premium']
                         if premium != 0:
                             return round((brokerage / premium) * 100, 2)
                         else:
