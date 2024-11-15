@@ -12002,8 +12002,9 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
                 # Create a DataFrame to hold mapped data
                 mapped_df = pd.DataFrame()
                 for attachment_col, template_col in mappings.items():
-                    if attachment_col.lower() == 'blank':
-                        print(f"Attachment column '{attachment_col}' is 'blank', skipping mapping for '{template_col}'.")
+                    # If the attachment column contains 'blank', skip mapping for this template column
+                    if 'blank' in attachment_col.lower():
+                        print(f"Attachment column '{attachment_col}' contains 'blank', skipping mapping for '{template_col}'.")
                         continue
                     if attachment_col in section.columns:
                         mapped_df[template_col] = section[attachment_col]
@@ -12020,16 +12021,16 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
 
             # Process 'Brokerage' columns according to your instructions
             if 'Brokerage1' in processed_df.columns:
-                # Check if 'Brokerage2' and 'Brokerage3' are mapped or exist
+                # Check if 'Brokerage2' and 'Brokerage3' were mapped
                 brokerage2_mapped = 'Brokerage2' in processed_df.columns
                 brokerage3_mapped = 'Brokerage3' in processed_df.columns
 
                 if not brokerage2_mapped and not brokerage3_mapped:
-                    # If 'Brokerage2' and 'Brokerage3' are not mapped, use 'Brokerage1' as 'Brokerage'
+                    # If Brokerage2 and Brokerage3 are not mapped (because their attachment columns contained 'blank'), use Brokerage1 as Brokerage
                     processed_df['Brokerage'] = processed_df['Brokerage1']
-                    print("Brokerage2 and Brokerage3 are not mapped, using Brokerage1 as Brokerage.")
+                    print("Brokerage2 and Brokerage3 mappings contained 'blank', using Brokerage1 as Brokerage.")
                 else:
-                    # If 'Brokerage2' and 'Brokerage3' are mapped but columns are missing or empty, use 'Brokerage1' as 'Brokerage'
+                    # Sum Brokerage1, Brokerage2, Brokerage3 into Brokerage
                     brokerage_columns = ['Brokerage1']
                     if brokerage2_mapped:
                         brokerage_columns.append('Brokerage2')
@@ -12046,18 +12047,18 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
                 print("'Brokerage1' column not in processed data, setting 'Brokerage' to empty.")
                 processed_df['Brokerage'] = ''
 
-            # Process 'Premium' columns similarly if needed
+            # Process 'Premium' columns similarly
             if 'Premium1' in processed_df.columns:
-                # Check if 'Premium2' and 'Premium3' are mapped or exist
+                # Check if 'Premium2' and 'Premium3' were mapped
                 premium2_mapped = 'Premium2' in processed_df.columns
                 premium3_mapped = 'Premium3' in processed_df.columns
 
                 if not premium2_mapped and not premium3_mapped:
-                    # If 'Premium2' and 'Premium3' are not mapped, use 'Premium1' as 'Premium'
+                    # If Premium2 and Premium3 are not mapped (because their attachment columns contained 'blank'), use Premium1 as Premium
                     processed_df['Premium'] = processed_df['Premium1']
-                    print("Premium2 and Premium3 are not mapped, using Premium1 as Premium.")
+                    print("Premium2 and Premium3 mappings contained 'blank', using Premium1 as Premium.")
                 else:
-                    # If 'Premium2' and 'Premium3' are mapped but columns are missing or empty, use 'Premium1' as 'Premium'
+                    # Sum Premium1, Premium2, Premium3 into Premium
                     premium_columns = ['Premium1']
                     if premium2_mapped:
                         premium_columns.append('Premium2')
@@ -12172,7 +12173,7 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
             else:
                 print("'Premium' or 'Brokerage' column not in processed data, cannot calculate 'Brokerage Rate'.")
 
-            # 'Income category' comes from mappings
+            # 'Income Category' comes from mappings
             if 'Income Category' not in processed_df.columns:
                 processed_df['Income Category'] = ''
                 print("'Income Category' not in processed data, setting to empty.")
@@ -12461,4 +12462,3 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
     except Exception as e:
         print(f"Error processing Future Generali India Insurance Company: {str(e)}")
         raise
-
