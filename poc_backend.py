@@ -11933,11 +11933,10 @@ def process_magma_hdi_general_insurance_company(file_path, template_data, risk_c
         raise
 
 
-
 def process_generali_india_insurance_company(file_path, template_data, risk_code_data, cust_neft_data,
                                              table_3, table_4, table_5, subject, mappings):
     try:
-        # Read the file based on its extension, including xlsb files
+        # Read the file based on its extension
         file_extension = os.path.splitext(file_path)[1].lower()
         if file_extension == '.xlsx':
             data = pd.read_excel(file_path, header=0)
@@ -11956,6 +11955,7 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
 
         print("Data read from file:")
         print(data.head(10))
+
         # Remove empty rows to avoid empty dataframes
         data = data.dropna(how='all').reset_index(drop=True)
         data = data[data.apply(lambda row: row.count() > 4, axis=1)].reset_index(drop=True)
@@ -11989,7 +11989,6 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
                 section_df.columns = columns
                 sections.append(section_df)
                 print(f"Section {idx+1} created from rows {start_idx} to {end_idx}")
-        # ---- Updated Splitting Logic Ends Here ----
 
         processed_sections = []
         for idx, section in enumerate(sections):
@@ -12002,17 +12001,16 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
                 print("Mappings provided, processing mappings.")
                 # Create a DataFrame to hold mapped data
                 mapped_df = pd.DataFrame()
-                for attachment_col, template_cols in mappings.items():
-                    if not isinstance(template_cols, list):
-                        template_cols = [template_cols]
+                for attachment_col, template_col in mappings.items():
+                    if attachment_col.lower() == 'blank':
+                        print(f"Attachment column '{attachment_col}' is 'blank', skipping mapping for '{template_col}'.")
+                        continue
                     if attachment_col in section.columns:
-                        for template_col in template_cols:
-                            mapped_df[template_col] = section[attachment_col]
-                            print(f"Mapped '{attachment_col}' to '{template_col}'")
+                        mapped_df[template_col] = section[attachment_col]
+                        print(f"Mapped '{attachment_col}' to '{template_col}'")
                     else:
-                        for template_col in template_cols:
-                            mapped_df[template_col] = ''
-                            print(f"Attachment column '{attachment_col}' not found, setting '{template_col}' to empty.")
+                        mapped_df[template_col] = ''
+                        print(f"Attachment column '{attachment_col}' not found, setting '{template_col}' to empty.")
             else:
                 print("No mappings provided, proceeding without mappings.")
                 mapped_df = section.copy()  # Proceed without mappings if not provided
@@ -12022,34 +12020,56 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
 
             # Process 'Brokerage' columns according to your instructions
             if 'Brokerage1' in processed_df.columns:
-                if (('Brokerage2' in processed_df.columns and processed_df['Brokerage2'].isnull().all()) or ('Brokerage2' not in processed_df.columns)) and \
-                   (('Brokerage3' in processed_df.columns and processed_df['Brokerage3'].isnull().all()) or ('Brokerage3' not in processed_df.columns)):
-                    # If Brokerage2 and Brokerage3 are blank or not present, then Brokerage1 is your Brokerage
+                # Check if 'Brokerage2' and 'Brokerage3' are mapped or exist
+                brokerage2_mapped = 'Brokerage2' in processed_df.columns
+                brokerage3_mapped = 'Brokerage3' in processed_df.columns
+
+                if not brokerage2_mapped and not brokerage3_mapped:
+                    # If 'Brokerage2' and 'Brokerage3' are not mapped, use 'Brokerage1' as 'Brokerage'
                     processed_df['Brokerage'] = processed_df['Brokerage1']
-                    print("Brokerage2 and Brokerage3 are blank or not present, using Brokerage1 as Brokerage.")
+                    print("Brokerage2 and Brokerage3 are not mapped, using Brokerage1 as Brokerage.")
                 else:
-                    # Sum Brokerage1, Brokerage2, Brokerage3 into Brokerage
-                    # Handle missing columns
-                    brokerage_columns = [col for col in ['Brokerage1', 'Brokerage2', 'Brokerage3'] if col in processed_df.columns]
-                    processed_df['Brokerage'] = processed_df[brokerage_columns].sum(axis=1, min_count=1)
-                    print("Summed Brokerage1, Brokerage2, Brokerage3 into Brokerage.")
+                    # If 'Brokerage2' and 'Brokerage3' are mapped but columns are missing or empty, use 'Brokerage1' as 'Brokerage'
+                    brokerage_columns = ['Brokerage1']
+                    if brokerage2_mapped:
+                        brokerage_columns.append('Brokerage2')
+                    if brokerage3_mapped:
+                        brokerage_columns.append('Brokerage3')
+
+                    # Convert columns to numeric
+                    for col in brokerage_columns:
+                        processed_df[col] = pd.to_numeric(processed_df[col], errors='coerce').fillna(0)
+
+                    processed_df['Brokerage'] = processed_df[brokerage_columns].sum(axis=1)
+                    print(f"Summed {brokerage_columns} into Brokerage.")
             else:
                 print("'Brokerage1' column not in processed data, setting 'Brokerage' to empty.")
                 processed_df['Brokerage'] = ''
 
             # Process 'Premium' columns similarly if needed
             if 'Premium1' in processed_df.columns:
-                if (('Premium2' in processed_df.columns and processed_df['Premium2'].isnull().all()) or ('Premium2' not in processed_df.columns)) and \
-                   (('Premium3' in processed_df.columns and processed_df['Premium3'].isnull().all()) or ('Premium3' not in processed_df.columns)):
-                    # If Premium2 and Premium3 are blank or not present, then Premium1 is your Premium
+                # Check if 'Premium2' and 'Premium3' are mapped or exist
+                premium2_mapped = 'Premium2' in processed_df.columns
+                premium3_mapped = 'Premium3' in processed_df.columns
+
+                if not premium2_mapped and not premium3_mapped:
+                    # If 'Premium2' and 'Premium3' are not mapped, use 'Premium1' as 'Premium'
                     processed_df['Premium'] = processed_df['Premium1']
-                    print("Premium2 and Premium3 are blank or not present, using Premium1 as Premium.")
+                    print("Premium2 and Premium3 are not mapped, using Premium1 as Premium.")
                 else:
-                    # Sum Premium1, Premium2, Premium3 into Premium
-                    # Handle missing columns
-                    premium_columns = [col for col in ['Premium1', 'Premium2', 'Premium3'] if col in processed_df.columns]
-                    processed_df['Premium'] = processed_df[premium_columns].sum(axis=1, min_count=1)
-                    print("Summed Premium1, Premium2, Premium3 into Premium.")
+                    # If 'Premium2' and 'Premium3' are mapped but columns are missing or empty, use 'Premium1' as 'Premium'
+                    premium_columns = ['Premium1']
+                    if premium2_mapped:
+                        premium_columns.append('Premium2')
+                    if premium3_mapped:
+                        premium_columns.append('Premium3')
+
+                    # Convert columns to numeric
+                    for col in premium_columns:
+                        processed_df[col] = pd.to_numeric(processed_df[col], errors='coerce').fillna(0)
+
+                    processed_df['Premium'] = processed_df[premium_columns].sum(axis=1)
+                    print(f"Summed {premium_columns} into Premium.")
             else:
                 print("'Premium1' column not in processed data, setting 'Premium' to empty.")
                 processed_df['Premium'] = ''
@@ -12139,8 +12159,8 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
                 print("Calculating 'Brokerage Rate'")
                 def calc_brokerage_rate(row):
                     try:
-                        brokerage = float(str(row['Brokerage']).replace(',', '').replace('(', '-').replace(')', '').strip())
-                        premium = float(str(row['Premium']).replace(',', '').replace('(', '-').replace(')', '').strip())
+                        brokerage = row['Brokerage']
+                        premium = row['Premium']
                         if premium != 0:
                             return round((brokerage / premium) * 100, 2)
                         else:
@@ -12153,9 +12173,9 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
                 print("'Premium' or 'Brokerage' column not in processed data, cannot calculate 'Brokerage Rate'.")
 
             # 'Income category' comes from mappings
-            if 'Income category' not in processed_df.columns:
-                processed_df['Income category'] = ''
-                print("'Income category' not in processed data, setting to empty.")
+            if 'Income Category' not in processed_df.columns:
+                processed_df['Income Category'] = ''
+                print("'Income Category' not in processed data, setting to empty.")
 
             # Set 'Entry No.' and other columns
             processed_df['Entry No.'] = range(1, len(processed_df) + 1)
@@ -12323,7 +12343,7 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
                     'TDS Ledger': [processed_df['TDS Ledger'].iloc[0], 'TDS Receivable - AY 2025-26'],
                     'RepDate': processed_df['RepDate'].iloc[-1],
                     'Branch': '',
-                    'Income category': ['', ''],
+                    'Income Category': ['', ''],
                     'ASP Practice': processed_df['ASP Practice'].iloc[-1],
                     'P & L JV': [invoice_nos, invoice_nos],
                     'NPT2': processed_df['NPT2'].iloc[-1]
@@ -12355,7 +12375,7 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
                     'TDS Ledger': ['TDS Receivable - AY 2025-26'],
                     'RepDate': processed_df['RepDate'].iloc[-1],
                     'Branch': '',
-                    'Income category': [''],
+                    'Income Category': [''],
                     'ASP Practice': [processed_df['ASP Practice'].iloc[-1]],
                     'P & L JV': [invoice_nos],
                     'NPT2': processed_df['NPT2'].iloc[-1]
@@ -12377,7 +12397,7 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
                 'Policy End Date', 'Premium', 'Brokerage Rate', 'Brokerage',
                 'Narration', 'NPT', 'Bank Ledger', 'AccountTypeDuplicate',
                 'Service Tax Ledger', 'TDS Ledger', 'RepDate', 'Branch',
-                'Income category', 'ASP Practice', 'P & L JV', 'NPT2',
+                'Income Category', 'ASP Practice', 'P & L JV', 'NPT2',
             ]
             for col in desired_columns:
                 if col not in processed_df.columns:
@@ -12441,3 +12461,4 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
     except Exception as e:
         print(f"Error processing Future Generali India Insurance Company: {str(e)}")
         raise
+
