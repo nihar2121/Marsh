@@ -4439,6 +4439,12 @@ def process_zuna_general_insurance(file_path, template_data, risk_code_data, cus
 def process_icici_prudential_life_insurance(file_path, template_data, risk_code_data, cust_neft_data,
                                             table_3, table_4, table_5, subject, mappings):
     try:
+        import os
+        import pandas as pd
+        import numpy as np
+        import re
+        from datetime import datetime
+
         print("Starting the processing of ICICI Prudential Life Insurance data...")
 
         # Read the file based on its extension, including xlsb files
@@ -4515,6 +4521,7 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
                 'shortform'
             ].to_dict()
             processed_df['Branch'] = processed_df['Branch'].map(branch_lookup).fillna('')
+            print("Mapped 'Branch' to shortform using state_lookups.")
         else:
             processed_df['Branch'] = ''
 
@@ -4553,15 +4560,10 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
         # Since no lookups are needed for 'Income category' and 'P & L JV', we skip those steps
         print("Skipped lookups for 'Income category' and 'P & L JV'.")
 
-        # Function to clean the subject
-        def clean_subject(subject):
-            # Remove prefixes like 'FW:', 'FWD:', 'RE:' at the beginning, case-insensitive
-            subject = subject.strip()
-            pattern = r'^(fw:|fwd:|re:)\s*'
-            cleaned_subject = re.sub(pattern, '', subject, flags=re.IGNORECASE).strip()
-            return cleaned_subject
+        # Remove the initial setting of 'NPT2'
+        # processed_df['NPT2'] = clean_subject(subject)
 
-        # Create necessary columns
+        # Create necessary columns, excluding 'NPT2' for now
         processed_df['Entry No.'] = range(1, len(processed_df) + 1)
         processed_df['Debtor Name'] = (
             processed_df['Debtor Name']
@@ -4573,7 +4575,6 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
         processed_df['Nature of Transaction'] = "Brokerage Statement"
         processed_df['TDS Ledger'] = processed_df['Debtor Name']
         processed_df['RepDate'] = datetime.today().strftime('%d-%b-%y')
-        processed_df['NPT2'] = clean_subject(subject)
         processed_df['Debtor Branch Ref'] = ''
         processed_df['ASP Practice'] = ''
         processed_df['NPT'] = ''
@@ -4636,29 +4637,33 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
             sum_brokerage = df_section['Brokerage'].astype(float).sum()
             print(f"Sum of 'Brokerage' for section {idx}: {sum_brokerage}")
 
-            # Get the brokerage value from 'table_3'
+            # Get the brokerage and tds column names from table_3
             if not table_3.empty:
                 brokerage_column_name = table_3.columns[0]  # First available column
-                net_column_name = table_3.columns[2] if len(table_3.columns) >= 3 else table_3.columns[-1]
-                print(f"Using '{brokerage_column_name}' and '{net_column_name}' from 'table_3'.")
+                tds_column_name = table_3.columns[1] if len(table_3.columns) >= 2 else None
+                net_column_name = table_3.columns[-1]  # Last column
+                print(f"Using '{brokerage_column_name}', '{tds_column_name}', and '{net_column_name}' from 'table_3'.")
 
+                # Clean and convert table_3 columns to numeric
                 table_3_brokerage_values = table_3[brokerage_column_name].astype(str).str.replace(',', '', regex=False).astype(float)
+                table_3_tds_values = table_3[tds_column_name].astype(str).str.replace(',', '', regex=False).astype(float) if tds_column_name else pd.Series([0.0]*len(table_3))
                 table_3_net_values = table_3[net_column_name].astype(str).str.replace(',', '', regex=False).astype(float)
 
-                # Find matching net value from 'table_3' corresponding to 'sum_brokerage'
-                net_value = None
-                for b_val, n_val in zip(table_3_brokerage_values, table_3_net_values):
-                    if np.isclose(b_val, sum_brokerage, atol=0.01):
-                        net_value = n_val
-                        print(f"Found matching net value in 'table_3': {net_value}")
-                        break
-
-                if net_value is None:
+                # Find matching row in table_3 based on sum_brokerage
+                matching_index_table3 = table_3_brokerage_values[np.isclose(table_3_brokerage_values, sum_brokerage, atol=0.01)].index
+                if not matching_index_table3.empty:
+                    matching_index_table3 = matching_index_table3[0]
+                    net_value = table_3_net_values.iloc[matching_index_table3]
+                    tds_value = table_3_tds_values.iloc[matching_index_table3]
+                    print(f"Found matching row in 'table_3': net_value={net_value}, tds_value={tds_value}")
+                else:
                     net_value = table_3_net_values.iloc[0]
-                    print(f"No matching net value found. Using first net value: {net_value}")
+                    tds_value = table_3_tds_values.iloc[0] if tds_column_name else 0.0
+                    print(f"No matching row found in 'table_3'. Using first row: net_value={net_value}, tds_value={tds_value}")
             else:
                 net_value = 0.0
-                print("Table 'table_3' is empty. Using net value: 0.0")
+                tds_value = 0.0
+                print("Table 'table_3' is empty. Using net_value=0.0 and tds_value=0.0")
 
             # Compare net_value with 'Amount' column in 'table_4' to find matching row
             matching_row = None
@@ -4673,29 +4678,39 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
                 amount_values_numeric = pd.to_numeric(
                     amount_values_cleaned, errors='coerce'
                 ).fillna(0)
+                print("Cleaned 'Amount' column in 'table_4'.")
 
-                for idx_table4, amount in enumerate(amount_values_numeric):
-                    if np.isclose(amount, net_value, atol=0.01):
-                        matching_row = table_4.iloc[idx_table4]
-                        print(f"Found matching amount in 'table_4' at index {idx_table4}.")
-                        break
+                matching_indices_table4 = amount_values_numeric[np.isclose(amount_values_numeric, net_value, atol=0.01)].index
+                if not matching_indices_table4.empty:
+                    matching_row = table_4.iloc[matching_indices_table4[0]]
+                    print(f"Found matching amount in 'table_4' at index {matching_indices_table4[0]}.")
+                else:
+                    print("No matching amount found in 'table_4'.")
+            else:
+                print("Column 'Amount' not found in 'table_4'.")
 
             if matching_row is not None:
                 # Extract necessary values from the matching row
                 narration_from_table_4 = matching_row.get('Narration', '')
+                npt2_value = matching_row.get('Narration (Ref)', '') or narration_from_table_4
                 invoice_nos = matching_row.get('Invoice No', '')
                 bank_value = matching_row.get('Bank', '')
                 date_col = matching_row.get('Date', datetime.today().strftime('%d/%m/%Y'))
                 insurer_name = matching_row.get('Insurer Name', '')
-                print(f"Extracted values from matching row in 'table_4'.")
+                print("Extracted values from matching row in 'table_4'.")
             else:
                 # If no matching amount found, use default or first row values
                 narration_from_table_4 = table_4['Narration'].iloc[0] if 'Narration' in table_4.columns else ''
+                npt2_value = table_4['Narration (Ref)'].iloc[0] if 'Narration (Ref)' in table_4.columns else narration_from_table_4
                 invoice_nos = ', '.join(table_4['Invoice No'].dropna().astype(str).unique()) if 'Invoice No' in table_4.columns else ''
                 bank_value = table_4['Bank'].iloc[0] if 'Bank' in table_4.columns else ''
                 date_col = table_4['Date'].iloc[0] if 'Date' in table_4.columns else datetime.today().strftime('%d/%m/%Y')
                 insurer_name = table_4['Insurer Name'].iloc[0] if 'Insurer Name' in table_4.columns else ''
                 print("No matching amount found in 'table_4'. Using default values.")
+
+            # Set 'NPT2' based on table_4's narration or narration_ref
+            df_section['NPT2'] = npt2_value
+            print(f"Set 'NPT2' to '{npt2_value}' for section {idx}.")
 
             # Remove extra spaces from 'Narration' for file naming
             safe_narration = ' '.join(narration_from_table_4.split())
@@ -4720,13 +4735,19 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
             df_section['Service Tax Ledger'] = df_section[
                 'Debtor Branch Ref'
             ].str.replace('CUST_NEFT_', '', regex=False)
+            print(f"Set 'Debtor Branch Ref' to '{debtor_branch_ref}' and updated 'Service Tax Ledger'.")
 
             # Set 'Debtor Name' as 'Insurer Name'
             df_section['Debtor Name'] = insurer_name
+            print(f"Set 'Debtor Name' to '{insurer_name}'.")
 
             # Convert date to dd/mm/yyyy format
-            date_col_formatted = pd.to_datetime(date_col).strftime('%d/%m/%Y')
-            print(f"Formatted date: {date_col_formatted}")
+            try:
+                date_col_formatted = pd.to_datetime(date_col).strftime('%d/%m/%Y')
+                print(f"Formatted date: {date_col_formatted}")
+            except Exception as e:
+                date_col_formatted = datetime.today().strftime('%d/%m/%Y')
+                print(f"Error formatting date: {e}. Using today's date: {date_col_formatted}")
 
             # Get 'supplier_name_col' from 'table_4'
             supplier_name_col = ''
@@ -4742,7 +4763,7 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
             )
             print(f"GST present: {gst_present}")
 
-            # Create narration with or without 'with GST'
+            # Create 'Narration' with GST information
             if gst_present:
                 narration = (
                     f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs."
@@ -4768,32 +4789,14 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
             df_section['Bank Ledger'] = bank_ledger_value
             print(f"Bank Ledger set to: '{bank_ledger_value}'")
 
-            # Set 'TDS Ledger' as 'Debtor Name'
-            df_section['TDS Ledger'] = df_section['Debtor Name']
+            # Set 'TDS Ledger' based on tds_value
+            df_section['TDS Ledger'] = f"TDS Receivable - AY {tds_value:.2f}"
+            print(f"Set 'TDS Ledger' to: 'TDS Receivable - AY {tds_value:.2f}'")
 
             # Calculate Brokerage values for new rows
-            tds_column = None
-            for col in data.columns:
-                if 'TDS' in col or 'TDS @10%' in col:
-                    tds_column = col
-                    break
-
-            if tds_column:
-                tds_values_cleaned = (
-                    data[tds_column]
-                    .astype(str)
-                    .str.replace(',', '', regex=False)
-                    .str.replace('(', '', regex=False)
-                    .str.replace(')', '', regex=False)
-                )
-                tds_values_numeric = pd.to_numeric(
-                    tds_values_cleaned, errors='coerce'
-                ).fillna(0)
-                third_new_row_brokerage = -abs(tds_values_numeric.sum())
-                print(f"TDS value calculated: {third_new_row_brokerage}")
-            else:
-                third_new_row_brokerage = 0.0
-                print("TDS column not found. Setting TDS value to 0.0.")
+            # TDS is now set as per 'tds_value' from table_3
+            third_new_row_brokerage = -abs(tds_value)
+            print(f"TDS value calculated: {third_new_row_brokerage}")
 
             if gst_present:
                 gst_amount = sum_brokerage * 0.18  # Assuming GST is 18%
@@ -4837,8 +4840,9 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
                     'Income category': ['', ''],
                     'ASP Practice': df_section['ASP Practice'].iloc[-1],
                     'P & L JV': [invoice_nos, invoice_nos],
-                    'NPT2': df_section['NPT2'].iloc[-1],
+                    'NPT2': [npt2_value, npt2_value],
                 })
+                print("Created additional rows with GST and TDS Receivable.")
             else:
                 # Create additional row
                 new_rows = pd.DataFrame({
@@ -4868,8 +4872,10 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
                     'Income category': [''],
                     'ASP Practice': [df_section['ASP Practice'].iloc[-1]],
                     'P & L JV': [invoice_nos],
-                    'NPT2': df_section['NPT2'].iloc[-1],
+                    'NPT2': [npt2_value],
                 })
+                print("Created additional row with TDS Receivable.")
+
             print("Created additional rows.")
 
             # Ensure numeric columns are formatted properly
@@ -4883,6 +4889,8 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
                         lambda x: "{0:.2f}".format(x)
                     )
                     print(f"Formatted numeric column '{column}' in new rows.")
+                else:
+                    print(f"Column '{column}' not found in new_rows during formatting.")
 
             # Concatenate new_rows to df_section
             df_section = pd.concat([df_section, new_rows], ignore_index=True)
@@ -4890,6 +4898,7 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
 
             # Update 'Entry No.'
             df_section['Entry No.'] = range(1, len(df_section) + 1)
+            print(f"Updated 'Entry No.' for section {idx}.")
 
             # Rearranging columns to desired order
             desired_columns = [
@@ -4951,12 +4960,13 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
 
         print("Completed processing all sections.")
 
-        # Return the list of processed dataframes and the list of paths to the Excel files
+        # Return the first dataframe and first file path, as per original code
         return dataframes[0], file_paths[0]
 
     except Exception as e:
         print(f"Error processing ICICI Prudential Life Insurance data: {str(e)}")
         raise
+
 
 
 
