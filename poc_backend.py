@@ -13528,9 +13528,6 @@ def process_aditya_insurance_co(file_path, template_data, risk_code_data, cust_n
         raise
 
 
-
-
-
 def process_star_india_diachi(file_path, template_data, risk_code_data, cust_neft_data,
                               table_3, table_4, table_5, subject, mappings):
     try:
@@ -13584,13 +13581,20 @@ def process_star_india_diachi(file_path, template_data, risk_code_data, cust_nef
         else:
             print("No mappings provided. Proceeding without mappings.")
 
+        # Debug: Check if 'Income category' is populated after mapping
+        if 'Income category' in processed_df.columns:
+            unique_income_categories = processed_df['Income category'].unique()
+            print(f"Unique 'Income category' values after mapping: {unique_income_categories}")
+        else:
+            print("'Income category' column not found in processed_df after mapping.")
+
         # Clean 'Client Name' field to remove extra spaces
         if 'Client Name' in processed_df.columns:
             processed_df['Client Name'] = processed_df['Client Name'].astype(str).str.strip()
             processed_df['Client Name'] = processed_df['Client Name'].str.replace(r'\s+', ' ', regex=True)
             print("Cleaned 'Client Name' field to remove extra spaces.")
 
-        # Process 'Branch'
+        # Handle 'Branch' column with state lookups
         if 'Branch' in processed_df.columns:
             state_lookups_sheet2 = pd.read_excel(
                 r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
@@ -13610,11 +13614,11 @@ def process_star_india_diachi(file_path, template_data, risk_code_data, cust_nef
             branch_lookup = state_lookups_sheet2.set_index('state')[
                 'shortform'
             ].to_dict()
-            processed_df['Branch'] = processed_df['Branch'].map(branch_lookup).fillna('')
-            print("Processed 'Branch' based on state lookups.")
+            # Update Branch mapping and preserve original value if mapping fails
+            processed_df['Branch'] = processed_df['Branch'].map(branch_lookup).fillna(processed_df['Branch'])
         else:
             processed_df['Branch'] = ''
-            print("'Branch' not in processed data. Set to empty.")
+            print("'Branch' column not found in processed_df. Filled with empty strings.")
 
         # Ensure numeric columns are handled correctly after mappings
         numeric_columns = ['Premium', 'Brokerage']
@@ -13636,7 +13640,7 @@ def process_star_india_diachi(file_path, template_data, risk_code_data, cust_nef
                 print(f"Column '{column}' not found in processed_df. Filled with 0.00.")
 
         # Handle dates in 'Policy Start Date' and 'Policy End Date' columns after mappings
-        date_columns = ['Policy Start Date']
+        date_columns = ['Policy Start Date', 'Policy End Date']
         for column in date_columns:
             if column in processed_df.columns and not processed_df[column].empty:
                 processed_df[column] = processed_df[column].apply(parse_date_flexible)
@@ -13648,17 +13652,8 @@ def process_star_india_diachi(file_path, template_data, risk_code_data, cust_nef
             else:
                 print(f"Column '{column}' not found or empty in processed_df.")
 
-        # Map 'Income category' based on 'Risk' and 'risk_code_data'
-        if 'Risk' in processed_df.columns and not risk_code_data.empty:
-            risk_code_data['Risk'] = risk_code_data['Risk'].astype(str).str.strip().str.lower()
-            risk_code_data['Income category'] = risk_code_data['Income category'].astype(str).str.strip()
-            risk_lookup = risk_code_data.set_index('Risk')['Income category'].to_dict()
-            processed_df['Risk'] = processed_df['Risk'].astype(str).str.strip().str.lower()
-            processed_df['Income category'] = processed_df['Risk'].map(risk_lookup).fillna('')
-            print("Mapped 'Risk' to 'Income category' using 'risk_code_data'.")
-        else:
-            processed_df['Income category'] = ''
-            print("'Risk' not in processed data or 'risk_code_data' is empty. Set 'Income category' to empty.")
+        # Since no lookups are needed for 'P & L JV', we skip those steps
+        print("Skipped lookups for 'P & L JV'.")
 
         # Function to clean the subject
         def clean_subject(subject):
@@ -13708,7 +13703,7 @@ def process_star_india_diachi(file_path, template_data, risk_code_data, cust_nef
 
         if 'Endorsement No.' in processed_df.columns:
             processed_df['P & L JV'] = processed_df.apply(
-                lambda row: 'Endorsement' if row['Endorsement No.'] not in ('', '0', '1', '00', '000', '0.00', '0.0') else '', axis=1
+                lambda row: 'Endorsement' if row['Endorsement No.'] not in ('', '0', '1', '00', '000') else '', axis=1
             )
             print("Processed 'P & L JV' based on 'Endorsement No.'")
         else:
@@ -13889,15 +13884,32 @@ def process_star_india_diachi(file_path, template_data, risk_code_data, cust_nef
 
             # Calculate Brokerage values for new rows
             tds_column = None
-            # First, look for 'TDS' column in 'data'
+            data_source = None
+
+            # First, check in 'data'
             for col in data.columns:
                 if 'TDS' in col or 'TDS @10%' in col:
                     tds_column = col
+                    data_source = data
                     break
 
-            if tds_column:
+            # If not found in 'data', check in 'table_3'
+            if tds_column is None:
+                for col in table_3.columns:
+                    if 'TDS' in col or 'TDS @10%' in col:
+                        tds_column = col
+                        data_source = table_3
+                        break
+
+            # If still not found, default to the second column in 'table_3'
+            if tds_column is None and len(table_3.columns) >= 2:
+                tds_column = table_3.columns[1]
+                data_source = table_3
+                print(f"TDS column not found. Defaulting to second column '{tds_column}' in 'table_3'.")
+
+            if tds_column and data_source is not None:
                 tds_values_cleaned = (
-                    data[tds_column]
+                    data_source[tds_column]
                     .astype(str)
                     .str.replace(',', '', regex=False)
                     .str.replace('(', '', regex=False)
@@ -13907,30 +13919,10 @@ def process_star_india_diachi(file_path, template_data, risk_code_data, cust_nef
                     tds_values_cleaned, errors='coerce'
                 ).fillna(0)
                 third_new_row_brokerage = -abs(tds_values_numeric.sum())
-                print(f"TDS value calculated from data: {third_new_row_brokerage}")
+                print(f"TDS value calculated: {third_new_row_brokerage}")
             else:
-                # TDS column not found in 'data', look for 'TDS' in 'table_3'
-                tds_column_table3 = None
-                for col in table_3.columns:
-                    if 'TDS' in col or 'TDS @10%' in col:
-                        tds_column_table3 = col
-                        break
-                if tds_column_table3:
-                    tds_values_cleaned = (
-                        table_3[tds_column_table3]
-                        .astype(str)
-                        .str.replace(',', '', regex=False)
-                        .str.replace('(', '', regex=False)
-                        .str.replace(')', '', regex=False)
-                    )
-                    tds_values_numeric = pd.to_numeric(
-                        tds_values_cleaned, errors='coerce'
-                    ).fillna(0)
-                    third_new_row_brokerage = -abs(tds_values_numeric.sum())
-                    print(f"TDS value calculated from table_3: {third_new_row_brokerage}")
-                else:
-                    third_new_row_brokerage = 0.0
-                    print("TDS column not found in data or table_3. Setting TDS value to 0.0.")
+                third_new_row_brokerage = 0.0
+                print("TDS column not found in data or table_3. Setting TDS value to 0.0.")
 
             if gst_present:
                 gst_amount = sum_brokerage * 0.18  # Assuming GST is 18%
@@ -13970,8 +13962,8 @@ def process_star_india_diachi(file_path, template_data, risk_code_data, cust_nef
                         'TDS Receivable - AY 2025-26',
                     ],
                     'RepDate': df_section['RepDate'].iloc[-1],
-                    'Branch': df_section['Branch'].iloc[0],
-                    'Income category': ['', ''],
+                    'Branch': [df_section['Branch'].iloc[0], df_section['Branch'].iloc[0]] if 'Branch' in df_section.columns else '',
+                    'Income category': [df_section['Income category'].iloc[0], df_section['Income category'].iloc[0]] if 'Income category' in df_section.columns else ['', ''],
                     'ASP Practice': df_section['ASP Practice'].iloc[-1],
                     'P & L JV': [invoice_nos, invoice_nos],
                     'NPT2': df_section['NPT2'].iloc[-1],
@@ -14001,8 +13993,8 @@ def process_star_india_diachi(file_path, template_data, risk_code_data, cust_nef
                     'Service Tax Ledger': ['2300022'],
                     'TDS Ledger': ['TDS Receivable - AY 2025-26'],
                     'RepDate': df_section['RepDate'].iloc[-1],
-                    'Branch': df_section['Branch'].iloc[0],
-                    'Income category': [''],
+                    'Branch': [df_section['Branch'].iloc[0]] if 'Branch' in df_section.columns else '',
+                    'Income category': [df_section['Income category'].iloc[0]] if 'Income category' in df_section.columns else [''],
                     'ASP Practice': [df_section['ASP Practice'].iloc[-1]],
                     'P & L JV': [invoice_nos],
                     'NPT2': df_section['NPT2'].iloc[-1],
@@ -14096,11 +14088,10 @@ def process_star_india_diachi(file_path, template_data, risk_code_data, cust_nef
         raise
 
 
-
 def process_future_generalli_life_insurance(file_path, template_data, risk_code_data, cust_neft_data,
-                                            table_3, table_4, table_5, subject, mappings):
+                              table_3, table_4, table_5, subject, mappings):
     try:
-        print("Starting the processing Future Generali India data...")
+        print("Starting the processing future generalli data...")
 
         # Read the file based on its extension, including xlsb files
         file_extension = os.path.splitext(file_path)[1].lower()
@@ -14150,12 +14141,20 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
         else:
             print("No mappings provided. Proceeding without mappings.")
 
+        # Debug: Check if 'Income category' is populated after mapping
+        if 'Income category' in processed_df.columns:
+            unique_income_categories = processed_df['Income category'].unique()
+            print(f"Unique 'Income category' values after mapping: {unique_income_categories}")
+        else:
+            print("'Income category' column not found in processed_df after mapping.")
+
         # Clean 'Client Name' field to remove extra spaces
         if 'Client Name' in processed_df.columns:
             processed_df['Client Name'] = processed_df['Client Name'].astype(str).str.strip()
             processed_df['Client Name'] = processed_df['Client Name'].str.replace(r'\s+', ' ', regex=True)
             print("Cleaned 'Client Name' field to remove extra spaces.")
 
+        # Handle 'Branch' column with state lookups
         if 'Branch' in processed_df.columns:
             state_lookups_sheet2 = pd.read_excel(
                 r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
@@ -14175,9 +14174,11 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
             branch_lookup = state_lookups_sheet2.set_index('state')[
                 'shortform'
             ].to_dict()
-            processed_df['Branch'] = processed_df['Branch'].map(branch_lookup).fillna('')
+            # Update Branch mapping and preserve original value if mapping fails
+            processed_df['Branch'] = processed_df['Branch'].map(branch_lookup).fillna(processed_df['Branch'])
         else:
             processed_df['Branch'] = ''
+            print("'Branch' column not found in processed_df. Filled with empty strings.")
 
         # Ensure numeric columns are handled correctly after mappings
         numeric_columns = ['Premium', 'Brokerage']
@@ -14199,7 +14200,7 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
                 print(f"Column '{column}' not found in processed_df. Filled with 0.00.")
 
         # Handle dates in 'Policy Start Date' and 'Policy End Date' columns after mappings
-        date_columns = ['Policy Start Date']
+        date_columns = ['Policy Start Date', 'Policy End Date']
         for column in date_columns:
             if column in processed_df.columns and not processed_df[column].empty:
                 processed_df[column] = processed_df[column].apply(parse_date_flexible)
@@ -14211,8 +14212,8 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
             else:
                 print(f"Column '{column}' not found or empty in processed_df.")
 
-        # Since no lookups are needed for 'Income category' and 'P & L JV', we skip those steps
-        print("Skipped lookups for 'Income category' and 'P & L JV'.")
+        # Since no lookups are needed for 'P & L JV', we skip those steps
+        print("Skipped lookups for 'P & L JV'.")
 
         # Function to clean the subject
         def clean_subject(subject):
@@ -14227,7 +14228,7 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
         processed_df['Debtor Name'] = (
             processed_df['Debtor Name']
             if 'Debtor Name' in processed_df.columns
-            else 'Future Generali India Life Insurance Co Ltd'
+            else 'Future Generali India Life Insurance Company Ltd.'
         )
         processed_df['AccountType'] = "Customer"
         processed_df['AccountTypeDuplicate'] = processed_df['AccountType']
@@ -14259,16 +14260,16 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
         else:
             processed_df['Brokerage Rate'] = 0.00
             print("Columns 'Premium' or 'Brokerage' not found in processed_df.")
-        
+
         if 'Endorsement No.' in processed_df.columns:
             processed_df['P & L JV'] = processed_df.apply(
-                lambda row: 'Endorsement' if row['Endorsement No.'] not in  ('','0', '1', '00', '000') else '', axis=1
+                lambda row: 'Endorsement' if row['Endorsement No.'] not in ('', '0', '1', '00', '000') else '', axis=1
             )
             print("Processed 'P & L JV' based on 'Endorsement No.'")
         else:
             processed_df['P & L JV'] = ''
             print("'Endorsement No.' not in processed data, setting 'P & L JV' to empty.")
-    
+
         # Round numeric columns
         for column in numeric_columns + ['Brokerage Rate']:
             if column in processed_df.columns:
@@ -14443,14 +14444,32 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
 
             # Calculate Brokerage values for new rows
             tds_column = None
+            data_source = None
+
+            # First, check in 'data'
             for col in data.columns:
                 if 'TDS' in col or 'TDS @10%' in col:
                     tds_column = col
+                    data_source = data
                     break
 
-            if tds_column:
+            # If not found in 'data', check in 'table_3'
+            if tds_column is None:
+                for col in table_3.columns:
+                    if 'TDS' in col or 'TDS @10%' in col:
+                        tds_column = col
+                        data_source = table_3
+                        break
+
+            # If still not found, default to the second column in 'table_3'
+            if tds_column is None and len(table_3.columns) >= 2:
+                tds_column = table_3.columns[1]
+                data_source = table_3
+                print(f"TDS column not found. Defaulting to second column '{tds_column}' in 'table_3'.")
+
+            if tds_column and data_source is not None:
                 tds_values_cleaned = (
-                    data[tds_column]
+                    data_source[tds_column]
                     .astype(str)
                     .str.replace(',', '', regex=False)
                     .str.replace('(', '', regex=False)
@@ -14463,7 +14482,7 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
                 print(f"TDS value calculated: {third_new_row_brokerage}")
             else:
                 third_new_row_brokerage = 0.0
-                print("TDS column not found. Setting TDS value to 0.0.")
+                print("TDS column not found in data or table_3. Setting TDS value to 0.0.")
 
             if gst_present:
                 gst_amount = sum_brokerage * 0.18  # Assuming GST is 18%
@@ -14503,8 +14522,8 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
                         'TDS Receivable - AY 2025-26',
                     ],
                     'RepDate': df_section['RepDate'].iloc[-1],
-                    'Branch': '',
-                    'Income category': ['', ''],
+                    'Branch': [df_section['Branch'].iloc[0], df_section['Branch'].iloc[0]] if 'Branch' in df_section.columns else '',
+                    'Income category': [df_section['Income category'].iloc[0], df_section['Income category'].iloc[0]] if 'Income category' in df_section.columns else ['', ''],
                     'ASP Practice': df_section['ASP Practice'].iloc[-1],
                     'P & L JV': [invoice_nos, invoice_nos],
                     'NPT2': df_section['NPT2'].iloc[-1],
@@ -14534,8 +14553,8 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
                     'Service Tax Ledger': ['2300022'],
                     'TDS Ledger': ['TDS Receivable - AY 2025-26'],
                     'RepDate': df_section['RepDate'].iloc[-1],
-                    'Branch': '',
-                    'Income category': [''],
+                    'Branch': [df_section['Branch'].iloc[0]] if 'Branch' in df_section.columns else '',
+                    'Income category': [df_section['Income category'].iloc[0]] if 'Income category' in df_section.columns else [''],
                     'ASP Practice': [df_section['ASP Practice'].iloc[-1]],
                     'P & L JV': [invoice_nos],
                     'NPT2': df_section['NPT2'].iloc[-1],
@@ -14625,6 +14644,5 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
         return dataframes[0], file_paths[0]
 
     except Exception as e:
-        print(f"Error processing Future Generali India Life Insurance: {str(e)}")
+        print(f"Error processing future generalli Life Insurance Company Ltd data: {str(e)}")
         raise
-
