@@ -15854,8 +15854,24 @@ def process_max_life_insurance(file_path, template_data, risk_code_data, cust_ne
         raise
 
 
+import os
+import pandas as pd
+import numpy as np
+from datetime import datetime
+from dateutil import parser
+
+def parse_date_flexible(date_str):
+    """
+    Parses a date string into a datetime object.
+    Returns None if parsing fails.
+    """
+    try:
+        return parser.parse(date_str, dayfirst=False)
+    except (ValueError, TypeError):
+        return None
+
 def process_aditya_birla_sun_life(file_path, template_data, risk_code_data, cust_neft_data,
-                                table_3, table_4, table_5, subject, mappings):
+                                  table_3, table_4, table_5, subject, mappings):
     try:
         # Read the file based on its extension
         file_extension = os.path.splitext(file_path)[1].lower()
@@ -15916,7 +15932,10 @@ def process_aditya_birla_sun_life(file_path, template_data, risk_code_data, cust
             print(f"Processing section {idx+1}")
             # Clean column names and data
             section.columns = section.columns.str.strip()
-            section = section.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+            # Replace applymap with apply on each column to avoid deprecation warning
+            for col in section.columns:
+                if section[col].dtype == object:
+                    section[col] = section[col].apply(lambda x: x.strip() if isinstance(x, str) else x)
             # Process mappings from frontend (attachment columns on left, template columns on right)
             if mappings:
                 print("Mappings provided, processing mappings.")
@@ -16016,9 +16035,7 @@ def process_aditya_birla_sun_life(file_path, template_data, risk_code_data, cust
                 processed_df['Branch'] = (
                     processed_df['Branch'].astype(str).str.strip().str.lower()
                 )
-                branch_lookup = state_lookups_sheet2.set_index('state')[
-                    'shortform'
-                ].to_dict()
+                branch_lookup = state_lookups_sheet2.set_index('state')['shortform'].to_dict()
                 processed_df['Branch'] = processed_df['Branch'].map(branch_lookup).fillna('')
             else:
                 print("'Branch' column not in processed data, setting 'Branch' to empty.")
@@ -16099,7 +16116,7 @@ def process_aditya_birla_sun_life(file_path, template_data, risk_code_data, cust
                 processed_df['Income Category'] = ''
                 print("'Income Category' not in processed data, setting to empty.")
 
-            # Set 'Entry No.' and other columns
+            # Set 'Entry No.' and other default columns
             processed_df['Entry No.'] = range(1, len(processed_df) + 1)
             processed_df['Debtor Name'] = 'Aditya Birla Sun Life Insurance Company Limited'
             processed_df['AccountType'] = "Customer"
@@ -16151,7 +16168,7 @@ def process_aditya_birla_sun_life(file_path, template_data, risk_code_data, cust
             print(f"Narration from 'table_4': {narration_from_table_4}")
 
             # Get 'GST' presence in 'table_3' columns
-            gst_present = any('GST' in col or 'GST @18%' in col for col in table_3.columns)
+            gst_present = any('gst' in col.lower() for col in table_3.columns)
             print(f"Is GST present in 'table_3' columns? {gst_present}")
 
             # Remove special characters from 'Narration' for file naming
@@ -16206,23 +16223,9 @@ def process_aditya_birla_sun_life(file_path, template_data, risk_code_data, cust
             else:
                 print("No missing required fields found.")
 
-            # 'P & L JV' logic continues here...
+            # 'Brokerage Rate' and 'Narration' have been set above
 
-            # 'Narration' logic
-            if gst_present:
-                if not np.isclose(float(narration_value_original.replace(',', '')), net_amount_value, atol=0.01):
-                    narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} ({net_amount_value_formatted}) from {supplier_name_col} with GST 18%"
-                else:
-                    narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} with GST 18%"
-            else:
-                if not np.isclose(float(narration_value_original.replace(',', '')), net_amount_value, atol=0.01):
-                    narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} ({net_amount_value_formatted}) from {supplier_name_col} without GST 18%"
-                else:
-                    narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} without GST 18%"
-            processed_df['Narration'] = narration
-            print(f"Narration set in processed data: {narration}")
-
-            # Map 'Bank Ledger' similar to others
+            # 'Bank Ledger' mapping
             bank_ledger_lookup = {
                 'CITI_005_2600004': 'CITIBANK 340214005 ACCOUNT',
                 'HSBC_001_2600014': 'HSBC A/C-030-618375-001',
@@ -16239,7 +16242,7 @@ def process_aditya_birla_sun_life(file_path, template_data, risk_code_data, cust
             # Calculate Brokerage values for the new rows
             tds_column = None
             for col in table_3.columns:
-                if 'TDS' in col or 'TDS @10%' in col:
+                if 'tds' in col.lower():
                     tds_column = col
                     break
             if tds_column is not None:
@@ -16257,74 +16260,78 @@ def process_aditya_birla_sun_life(file_path, template_data, risk_code_data, cust
                 print("No TDS column found in 'table_3', setting 'third_new_row_brokerage' to 0.0")
                 third_new_row_brokerage = 0.0
 
+            # Calculate GST amount
+            gst_amount = 0.0
             if gst_present:
                 gst_amount = sum_brokerage * 0.18  # Assuming GST is 18%
-                first_new_row_brokerage = gst_amount
-                print(f"GST amount calculated: {first_new_row_brokerage}")
-                # Create additional rows
+                print(f"GST amount calculated: {gst_amount:.2f}")
+
+            # Create additional rows based on GST presence
+            if gst_present:
+                # Ensure all scalar values are converted to lists of length 2
                 new_rows = pd.DataFrame({
-                    'Entry No.': '',
-                    'Debtor Name': processed_df['Debtor Name'].iloc[0],
+                    'Entry No.': ['', ''],
+                    'Debtor Name': [processed_df['Debtor Name'].iloc[0]] * 2,
                     'Nature of Transaction': ["GST Receipts", "Brokerage Statement"],
-                    'AccountType': processed_df['AccountType'].iloc[0],
-                    'Debtor Branch Ref': processed_df['Debtor Branch Ref'].iloc[0],
+                    'AccountType': [processed_df['AccountType'].iloc[0]] * 2,
+                    'Debtor Branch Ref': [processed_df['Debtor Branch Ref'].iloc[0]] * 2,
                     'Client Name': ["GST @ 18%", "TDS Receivable - AY 2025-26"],
-                    'Policy No.': '',
-                    'Risk': '',
+                    'Policy No.': ['', ''],
+                    'Risk': ['', ''],
                     'Endorsement No.': ["", ""],
-                    'Policy Type': '',
-                    'Policy Start Date': '',
-                    'Policy End Date': '',
-                    'Premium': '0.00',
-                    'Brokerage Rate': '',
-                    'Brokerage': [f"{first_new_row_brokerage:.2f}", f"{third_new_row_brokerage:.2f}"],
-                    'Narration': narration,
-                    'NPT': '',
-                    'Bank Ledger': bank_ledger_value,
+                    'Policy Type': ['', ''],
+                    'Policy Start Date': ['', ''],
+                    'Policy End Date': ['', ''],
+                    'Premium': ['0.00', '0.00'],
+                    'Brokerage Rate': ['', ''],
+                    'Brokerage': [f"{gst_amount:.2f}", f"{third_new_row_brokerage:.2f}"],
+                    'Narration': [narration, narration],
+                    'NPT': ['', ''],
+                    'Bank Ledger': [bank_ledger_value, bank_ledger_value],
                     'AccountTypeDuplicate': [processed_df['AccountTypeDuplicate'].iloc[0], 'G/L Account'],
                     'Service Tax Ledger': [
                         processed_df['Service Tax Ledger'].iloc[0],
                         '2300022'
                     ],
                     'TDS Ledger': [processed_df['TDS Ledger'].iloc[0], 'TDS Receivable - AY 2025-26'],
-                    'RepDate': processed_df['RepDate'].iloc[-1],
-                    'Branch': '',
+                    'RepDate': [processed_df['RepDate'].iloc[-1], processed_df['RepDate'].iloc[-1]],
+                    'Branch': ['', ''],
                     'Income Category': ['', ''],
-                    'ASP Practice': processed_df['ASP Practice'].iloc[-1],
+                    'ASP Practice': [processed_df['ASP Practice'].iloc[-1], processed_df['ASP Practice'].iloc[-1]],
                     'P & L JV': [invoice_nos, invoice_nos],
-                    'NPT2': processed_df['NPT2'].iloc[-1]
+                    'NPT2': [processed_df['NPT2'].iloc[-1], processed_df['NPT2'].iloc[-1]]
                 })
                 print("Created new rows for GST present case.")
             else:
-                # Create additional row
+                # Ensure all scalar values are converted to lists of length 1
                 new_rows = pd.DataFrame({
-                    'Entry No.': '',
-                    'Debtor Name': processed_df['Debtor Name'].iloc[0],
+                    'Entry No.': [''],
+                    'Debtor Name': [processed_df['Debtor Name'].iloc[0]],
                     'Nature of Transaction': ["Brokerage Statement"],
-                    'AccountType': processed_df['AccountType'].iloc[0],
-                    'Debtor Branch Ref': processed_df['Debtor Branch Ref'].iloc[0],
+                    'AccountType': [processed_df['AccountType'].iloc[0]],
+                    'Debtor Branch Ref': [processed_df['Debtor Branch Ref'].iloc[0]],
                     'Client Name': ["TDS Receivable - AY 2025-26"],
-                    'Policy No.': '',
-                    'Risk': '',
+                    'Policy No.': [''],
+                    'Risk': [''],
                     'Endorsement No.': [""],
-                    'Policy Type': '',
-                    'Policy Start Date': '',
-                    'Policy End Date': '',
-                    'Premium': '0.00',
-                    'Brokerage Rate': '',
+                    'Policy Type': [''],
+                    'Policy Start Date': [''],
+                    'Policy End Date': [''],
+                    'Premium': ['0.00'],
+                    'Brokerage Rate': [''],
                     'Brokerage': [f"{third_new_row_brokerage:.2f}"],
-                    'Narration': narration,
-                    'NPT': '',
-                    'Bank Ledger': bank_ledger_value,
+                    'Narration': [narration],
+                    'NPT': [''],
+                    'Bank Ledger': [bank_ledger_value],
                     'AccountTypeDuplicate': ['G/L Account'],
                     'Service Tax Ledger': ['2300022'],
                     'TDS Ledger': ['TDS Receivable - AY 2025-26'],
-                    'RepDate': processed_df['RepDate'].iloc[-1],
-                    'Branch': '',
+                    'RepDate': [processed_df['RepDate'].iloc[-1]],
+                    'Branch': [''],
                     'Income Category': [''],
                     'ASP Practice': [processed_df['ASP Practice'].iloc[-1]],
                     'P & L JV': [invoice_nos],
-                    'NPT2': processed_df['NPT2'].iloc[-1]
+                    'NPT2': [processed_df['NPT2'].iloc[-1]]
                 })
                 print("Created new row for GST not present case.")
 
@@ -16407,7 +16414,6 @@ def process_aditya_birla_sun_life(file_path, template_data, risk_code_data, cust
     except Exception as e:
         print(f"Error processing Aditya Birla Insurance Co. Ltd.: {str(e)}")
         raise
-
 
 def process_sbi_life_insurance_co(file_path, template_data, risk_code_data, cust_neft_data,
                                   table_3, table_4, table_5, subject, mappings):
