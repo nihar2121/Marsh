@@ -14258,7 +14258,11 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
             print("Applying mappings...")
             for attachment_col, template_col in mappings.items():
                 if attachment_col in data.columns:
-                    processed_df[template_col] = data[attachment_col]
+                    # For specific columns, enforce string type to preserve leading zeros
+                    if template_col in ['ASP Practice', 'Branch', 'Income category']:
+                        processed_df[template_col] = data[attachment_col].astype(str)
+                    else:
+                        processed_df[template_col] = data[attachment_col]
                     print(f"Mapped '{attachment_col}' to '{template_col}'.")
                 else:
                     processed_df[template_col] = ''
@@ -14294,13 +14298,13 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
                 sheet_name='Sheet2',
             )
             state_lookups_sheet2['state'] = (
-                state_lookups_sheet2['state'].astype(str).str.strip().str.lower()
+                state_lookups_sheet2['state'].astype(str).str.strip()
             )
             state_lookups_sheet2['shortform'] = (
                 state_lookups_sheet2['shortform'].astype(str).str.strip()
             )
             processed_df['Branch'] = (
-                processed_df['Branch'].astype(str).str.strip().str.lower()
+                processed_df['Branch'].astype(str).str.strip()
             )
             branch_lookup = state_lookups_sheet2.set_index('state')[
                 'shortform'
@@ -14443,26 +14447,20 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
             sum_brokerage = df_section['Brokerage'].astype(float).sum()
             print(f"Sum of 'Brokerage' for section {idx}: {sum_brokerage}")
 
-            # Get the brokerage value from 'table_3'
+            # Get the net value from 'table_3'
             if not table_3.empty:
-                brokerage_column_name = table_3.columns[0]  # First available column
-                net_column_name = table_3.columns[2] if len(table_3.columns) >= 3 else table_3.columns[-1]
-                print(f"Using '{brokerage_column_name}' and '{net_column_name}' from 'table_3'.")
-
-                table_3_brokerage_values = table_3[brokerage_column_name].astype(str).str.replace(',', '', regex=False).astype(float)
-                table_3_net_values = table_3[net_column_name].astype(str).str.replace(',', '', regex=False).astype(float)
-
-                # Find matching net value from 'table_3' corresponding to 'sum_brokerage'
-                net_value = None
-                for b_val, n_val in zip(table_3_brokerage_values, table_3_net_values):
-                    if np.isclose(b_val, sum_brokerage, atol=0.01):
-                        net_value = n_val
-                        print(f"Found matching net value in 'table_3': {net_value}")
-                        break
-
-                if net_value is None:
-                    net_value = table_3_net_values.iloc[0]
-                    print(f"No matching net value found. Using first net value: {net_value}")
+                first_row_first_col = table_3.iloc[0, 0]
+                try:
+                    # Try to convert first_row_first_col to float
+                    net_value = float(str(first_row_first_col).replace(',', '').replace('(', '').replace(')', ''))
+                    print(f"First row, first column is a number: {net_value}")
+                except ValueError:
+                    # It's not a number, so we treat it as a string
+                    print(f"First row, first column is a string: '{first_row_first_col}'")
+                    # Take first value of second column
+                    first_row_second_col = table_3.iloc[0, 1]
+                    net_value = float(str(first_row_second_col).replace(',', '').replace('(', '').replace(')', ''))
+                    print(f"Net value taken from first row, second column: {net_value}")
             else:
                 net_value = 0.0
                 print("Table 'table_3' is empty. Using net value: 0.0")
@@ -14634,20 +14632,10 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
                 gst_amount = 0.0
                 first_new_row_brokerage = 0.0
                 print("GST not present. GST amount set to 0.0.")
-            
+
+            # Create additional rows based on GST presence
             if gst_present:
-                if not np.isclose(float(narration_value_original.replace(',', '')), net_amount_value, atol=0.01):
-                    narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} ({net_amount_value_formatted}) from {supplier_name_col} with GST 18%"
-                else:
-                    narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} with GST 18%"
-            else:
-                if not np.isclose(float(narration_value_original.replace(',', '')), net_amount_value, atol=0.01):
-                    narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} ({net_amount_value_formatted}) from {supplier_name_col} without GST 18%"
-                else:
-                    narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} without GST 18%"
-            processed_df['Narration'] = narration
-            print(f"Narration set in processed data: {narration}")
-            if gst_present:                new_rows = pd.DataFrame({
+                new_rows = pd.DataFrame({
                     'Entry No.': [''] * 2,
                     'Debtor Name': [df_section['Debtor Name'].iloc[0]] * 2,
                     'Nature of Transaction': ["GST Receipts", "Brokerage Statement"],
@@ -14679,9 +14667,9 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
                         'TDS Receivable - AY 2025-26',
                     ],
                     'RepDate': [df_section['RepDate'].iloc[-1]] * 2,
-                    'Branch': [df_section['Branch'].iloc[0]] * 2 if 'Branch' in df_section.columns else ['', ''],
-                    'Income category': [df_section['Income category'].iloc[0]] * 2 if 'Income category' in df_section.columns else ['', ''],  # **Updated to match template**
-                    'ASP Practice': [df_section['ASP Practice'].iloc[0]] * 2 if 'ASP Practice' in df_section.columns else ['', ''],  # **Updated to match template**
+                    'Branch': ['', ''],
+                    'Income category': [df_section['Income category'].iloc[0]] * 2 if 'Income category' in df_section.columns else ['', ''],
+                    'ASP Practice': [df_section['ASP Practice'].iloc[0]] * 2 if 'ASP Practice' in df_section.columns else ['', ''],
                     'P & L JV': [invoice_nos, invoice_nos],
                     'NPT2': [df_section['NPT2'].iloc[-1]] * 2,
                 })
@@ -14710,9 +14698,9 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
                     'Service Tax Ledger': ['2300022'],
                     'TDS Ledger': ['TDS Receivable - AY 2025-26'],
                     'RepDate': [df_section['RepDate'].iloc[-1]],
-                    'Branch': [df_section['Branch'].iloc[0]] if 'Branch' in df_section.columns else [''],
-                    'Income category': [df_section['Income category'].iloc[0]] if 'Income category' in df_section.columns else [''],  # **Updated to match template**
-                    'ASP Practice': [df_section['ASP Practice'].iloc[0]] if 'ASP Practice' in df_section.columns else [''],  # **Updated to match template**
+                    'Branch': [''],
+                    'Income category': [df_section['Income category'].iloc[0]] if 'Income category' in df_section.columns else [''],
+                    'ASP Practice': [df_section['ASP Practice'].iloc[0]] if 'ASP Practice' in df_section.columns else [''],
                     'P & L JV': [invoice_nos],
                     'NPT2': [df_section['NPT2'].iloc[-1]],
                 })
@@ -14747,7 +14735,7 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
                 'Policy End Date', 'Premium', 'Brokerage Rate', 'Brokerage',
                 'Narration', 'NPT', 'Bank Ledger', 'AccountTypeDuplicate',
                 'Service Tax Ledger', 'TDS Ledger', 'RepDate', 'Branch',
-                'Income category', 'ASP Practice', 'P & L JV', 'NPT2',  # **Updated to match template**
+                'Income category', 'ASP Practice', 'P & L JV', 'NPT2',
             ]
             for col in desired_columns:
                 if col not in df_section.columns:
@@ -16996,7 +16984,7 @@ def process_sbi_life_insurance_co(file_path, template_data, risk_code_data, cust
                         'TDS Receivable - AY 2025-26',
                     ],
                     'RepDate': [df_section['RepDate'].iloc[-1]] * 2,
-                    'Branch': [df_section['Branch'].iloc[0]] * 2 if 'Branch' in df_section.columns else ['', ''],
+                    'Branch': ['', ''],
                     'Income category': [df_section['Income category'].iloc[0]] * 2 if 'Income category' in df_section.columns else ['', ''],  # **Updated to match template**
                     'ASP Practice': [df_section['ASP Practice'].iloc[0]] * 2 if 'ASP Practice' in df_section.columns else ['', ''],  # **Updated to match template**
                     'P & L JV': [invoice_nos, invoice_nos],
@@ -17027,7 +17015,7 @@ def process_sbi_life_insurance_co(file_path, template_data, risk_code_data, cust
                     'Service Tax Ledger': ['2300022'],
                     'TDS Ledger': ['TDS Receivable - AY 2025-26'],
                     'RepDate': [df_section['RepDate'].iloc[-1]],
-                    'Branch': [df_section['Branch'].iloc[0]] if 'Branch' in df_section.columns else [''],
+                    'Branch':  [''],
                     'Income category': [df_section['Income category'].iloc[0]] if 'Income category' in df_section.columns else [''],  # **Updated to match template**
                     'ASP Practice': [df_section['ASP Practice'].iloc[0]] if 'ASP Practice' in df_section.columns else [''],  # **Updated to match template**
                     'P & L JV': [invoice_nos],
