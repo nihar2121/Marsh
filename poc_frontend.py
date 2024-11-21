@@ -8,7 +8,7 @@ import extract_msg  # To read .msg files
 from bs4 import BeautifulSoup
 import openpyxl
 # Importing the backend functions
-from poc_backend import process_pramerica_life_insurance,process_max_life_insurance,process_aditya_birla_sun_life ,process_sbi_life_insurance_co,process_iffco_tokyo_insurer,process_star_india_diachi,process_future_generalli_life_insurance,process_aditya_insurance_co,process_manipal_health_insurance_company,process_generali_india_insurance_company,process_magma_hdi_general_insurance_company,process_care_health_insurance_limited,process_bajaj_allianz_life_insurance,process_relaince_general_insurance_co, process_hdfc_ergo_insurance, process_bajaj_allianz_insurance,process_tata_aig_insurance,process_royal_sundaram_general_insurance,process_raheja_general_insurance,process_godigit_general_insurance,proess_acko_general_insurance,process_sbi_general_insurance,process_liberty_general_insurance,process_cholamandalam_general_insurance,process_icici_prudential_life_insurance,process_zuna_general_insurance, process_universal_sampo_insurance,process_kotak_mahindra_insurance,process_shriram_general_insurance,process_hdfc_life_insurance_co,process_star_health_insurer,read_lookup_files,process_icici_lombard_insurance, process_new_india_assurance,process_oriental_insurance_co, process_united_india_insurance,process_tata_aia_insurance
+from poc_backend import process_pnb_metlife_insurance,process_pramerica_life_insurance,process_max_life_insurance,process_aditya_birla_sun_life ,process_sbi_life_insurance_co,process_iffco_tokyo_insurer,process_star_india_diachi,process_future_generalli_life_insurance,process_aditya_insurance_co,process_manipal_health_insurance_company,process_generali_india_insurance_company,process_magma_hdi_general_insurance_company,process_care_health_insurance_limited,process_bajaj_allianz_life_insurance,process_relaince_general_insurance_co, process_hdfc_ergo_insurance, process_bajaj_allianz_insurance,process_tata_aig_insurance,process_royal_sundaram_general_insurance,process_raheja_general_insurance,process_godigit_general_insurance,proess_acko_general_insurance,process_sbi_general_insurance,process_liberty_general_insurance,process_cholamandalam_general_insurance,process_icici_prudential_life_insurance,process_zuna_general_insurance, process_universal_sampo_insurance,process_kotak_mahindra_insurance,process_shriram_general_insurance,process_hdfc_life_insurance_co,process_star_health_insurer,read_lookup_files,process_icici_lombard_insurance, process_new_india_assurance,process_oriental_insurance_co, process_united_india_insurance,process_tata_aia_insurance
 from datetime import datetime
 from urllib.parse import unquote_plus
 
@@ -1099,14 +1099,17 @@ def select_insurer():
             read_tables_from_email(email_body, selected_insurer)  # Pass the selected insurer to the function
             default_mappings = {
                 'Product Name': 'Risk',
-                'Policy Number': 'Policy No.',
-                'GPH Name': 'Client Name',
+                'Policy No.': 'Policy No.',
+                'Client Name': 'Client Name',
                 'Risk exp date': 'Policy End Date',
                 'Risk inc date': 'Policy Start Date',
                 'Geographical State': 'Branch',
-                'Type of Transaction': 'Income Category',
+                'Type of Transaction': 'Income Category1',
+                'BILLNO': 'Income Category2'
                 'Endorsement ind': 'Endorsement No.',
-                ' ': 'Premium',
+                '': 'ASP Practice',
+                '': 'P & L JV',
+                'Premium': 'Premium',
                 'Commission': 'Brokerage'
                                                       }             
         else:
