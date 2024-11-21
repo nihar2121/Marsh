@@ -12176,14 +12176,6 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
                 processed_df['P & L JV'] = ''
                 print("'Endorsement No.' not in processed data, setting 'P & L JV' to empty.")
 
-            # Remove rows where both 'Premium' and 'Brokerage' are 0
-            if 'Premium' in processed_df.columns and 'Brokerage' in processed_df.columns:
-                processed_df[['Premium', 'Brokerage']] = processed_df[['Premium', 'Brokerage']].apply(pd.to_numeric, errors='coerce').fillna(0)
-                processed_df = processed_df[~((processed_df['Premium'] == 0) & (processed_df['Brokerage'] == 0))]
-                print("Removed rows where both 'Premium' and 'Brokerage' are 0.")
-            else:
-                print("'Premium' or 'Brokerage' column not in processed data.")
-
             # Ensure numeric columns are handled correctly after mappings
             numeric_columns = ['Premium', 'Brokerage']
             for column in numeric_columns:
@@ -12212,10 +12204,39 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
             else:
                 print("'Premium' or 'Brokerage' column not in processed data, cannot calculate 'Brokerage Rate'.")
 
-            # 'Income Category' comes from mappings
-            if 'Income Category' not in processed_df.columns:
-                processed_df['Income Category'] = ''
+            # Perform lookup on 'Income Category' and update 'Income Category'
+            if 'Income Category' in processed_df.columns:
+                print("Processing 'Income Category' with lookup")
+                state_lookups_sheet4 = pd.read_excel(
+                    r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
+                    r'\Common folder AP & AR\Brokerage Statement Automation\support files'
+                    r'\state_lookups.xlsx',
+                    sheet_name='Sheet4',
+                )
+                state_lookups_sheet4['BUSINESS_TYPE'] = (
+                    state_lookups_sheet4['BUSINESS_TYPE']
+                    .astype(str)
+                    .str.strip()
+                    .str.lower()
+                )
+                state_lookups_sheet4['lookups'] = (
+                    state_lookups_sheet4['lookups'].astype(str).str.strip()
+                )
+                processed_df['Income Category'] = (
+                    processed_df['Income Category']
+                    .astype(str)
+                    .str.strip()
+                    .str.lower()
+                )
+                income_category_lookup = (
+                    state_lookups_sheet4.set_index('BUSINESS_TYPE')['lookups'].to_dict()
+                )
+                processed_df['Income Category'] = processed_df['Income Category'].map(
+                    income_category_lookup
+                ).fillna('')
+            else:
                 print("'Income Category' not in processed data, setting to empty.")
+                processed_df['Income Category'] = ''
 
             # Set 'Entry No.' and other columns
             processed_df['Entry No.'] = range(1, len(processed_df) + 1)
@@ -12303,13 +12324,19 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
             print(f"Supplier name from 'table_4': {supplier_name_col}")
 
             # Create narration considering GST and value in brackets
+            narration_value_numeric = float(narration_value_original.replace(',', ''))
+            net_amount_value_rounded = round(net_amount_value, 2)
+
+            # Adjust the tolerance based on the magnitude of the amounts
+            tolerance = max(abs(narration_value_numeric), abs(net_amount_value_rounded)) * 1e-5
+
             if gst_present:
-                if not np.isclose(float(narration_value_original.replace(',', '')), net_amount_value, atol=0.01):
+                if not np.isclose(narration_value_numeric, net_amount_value_rounded, atol=tolerance):
                     narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} ({net_amount_value_formatted}) from {supplier_name_col} with GST 18%"
                 else:
                     narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} with GST 18%"
             else:
-                if not np.isclose(float(narration_value_original.replace(',', '')), net_amount_value, atol=0.01):
+                if not np.isclose(narration_value_numeric, net_amount_value_rounded, atol=tolerance):
                     narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} ({net_amount_value_formatted}) from {supplier_name_col} without GST 18%"
                 else:
                     narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} without GST 18%"
