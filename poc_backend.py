@@ -15409,6 +15409,9 @@ def process_max_life_insurance(file_path, template_data, risk_code_data, cust_ne
 
                     processed_df['Brokerage'] = processed_df[brokerage_columns].sum(axis=1)
                     print(f"Summed {brokerage_columns} into Brokerage.")
+            elif 'Brokerage' in processed_df.columns:
+                print("'Brokerage1' not in processed data but 'Brokerage' is present, using 'Brokerage' as is.")
+                # 'Brokerage' is already populated from mapping, we can proceed
             else:
                 print("'Brokerage1' column not in processed data, setting 'Brokerage' to empty.")
                 processed_df['Brokerage'] = ''
@@ -15437,6 +15440,9 @@ def process_max_life_insurance(file_path, template_data, risk_code_data, cust_ne
 
                     processed_df['Premium'] = processed_df[premium_columns].sum(axis=1)
                     print(f"Summed {premium_columns} into Premium.")
+            elif 'Premium' in processed_df.columns:
+                print("'Premium1' not in processed data but 'Premium' is present, using 'Premium' as is.")
+                # 'Premium' is already populated from mapping, we can proceed
             else:
                 print("'Premium1' column not in processed data, setting 'Premium' to empty.")
                 processed_df['Premium'] = ''
@@ -15705,14 +15711,14 @@ def process_max_life_insurance(file_path, template_data, risk_code_data, cust_ne
             if gst_present:
                 gst_amount = sum_brokerage * 0.18  # Assuming GST is 18%
                 first_new_row_brokerage = gst_amount
-                print(f"GST amount calculated: {first_new_row_brokerage}")
+                print(f"GST amount calculated: {first_new_row_brokerage:.2f}")
                 # Create additional rows
                 new_rows = pd.DataFrame({
                     'Entry No.': '',
-                    'Debtor Name': processed_df['Debtor Name'].iloc[0],
+                    'Debtor Name': processed_df['Debtor Name'].iloc[0] if not processed_df.empty else '',
                     'Nature of Transaction': ["GST Receipts", "Brokerage Statement"],
-                    'AccountType': processed_df['AccountType'].iloc[0],
-                    'Debtor Branch Ref': processed_df['Debtor Branch Ref'].iloc[0],
+                    'AccountType': processed_df['AccountType'].iloc[0] if not processed_df.empty else '',
+                    'Debtor Branch Ref': processed_df['Debtor Branch Ref'].iloc[0] if not processed_df.empty else '',
                     'Client Name': ["GST @ 18%", "TDS Receivable - AY 2025-26"],
                     'Policy No.': '',
                     'Risk': '',
@@ -15726,28 +15732,28 @@ def process_max_life_insurance(file_path, template_data, risk_code_data, cust_ne
                     'Narration': narration,
                     'NPT': '',
                     'Bank Ledger': bank_ledger_value,
-                    'AccountTypeDuplicate': [processed_df['AccountTypeDuplicate'].iloc[0], 'G/L Account'],
+                    'AccountTypeDuplicate': [processed_df['AccountTypeDuplicate'].iloc[0] if not processed_df.empty else '', 'G/L Account'],
                     'Service Tax Ledger': [
-                        processed_df['Service Tax Ledger'].iloc[0],
+                        processed_df['Service Tax Ledger'].iloc[0] if not processed_df.empty else '',
                         '2300022'
                     ],
-                    'TDS Ledger': [processed_df['TDS Ledger'].iloc[0], 'TDS Receivable - AY 2025-26'],
-                    'RepDate': processed_df['RepDate'].iloc[-1],
+                    'TDS Ledger': [processed_df['TDS Ledger'].iloc[0] if not processed_df.empty else '', 'TDS Receivable - AY 2025-26'],
+                    'RepDate': processed_df['RepDate'].iloc[-1] if not processed_df.empty else datetime.today().strftime('%d-%b-%y'),
                     'Branch': '',
                     'Income Category': ['', ''],
-                    'ASP Practice': processed_df['ASP Practice'].iloc[-1],
+                    'ASP Practice': processed_df['ASP Practice'].iloc[-1] if not processed_df.empty else '',
                     'P & L JV': [invoice_nos, invoice_nos],
-                    'NPT2': processed_df['NPT2'].iloc[-1]
+                    'NPT2': processed_df['NPT2'].iloc[-1] if not processed_df.empty else ''
                 })
                 print("Created new rows for GST present case.")
             else:
                 # Create additional row
                 new_rows = pd.DataFrame({
                     'Entry No.': '',
-                    'Debtor Name': processed_df['Debtor Name'].iloc[0],
+                    'Debtor Name': processed_df['Debtor Name'].iloc[0] if not processed_df.empty else '',
                     'Nature of Transaction': ["Brokerage Statement"],
-                    'AccountType': processed_df['AccountType'].iloc[0],
-                    'Debtor Branch Ref': processed_df['Debtor Branch Ref'].iloc[0],
+                    'AccountType': processed_df['AccountType'].iloc[0] if not processed_df.empty else '',
+                    'Debtor Branch Ref': processed_df['Debtor Branch Ref'].iloc[0] if not processed_df.empty else '',
                     'Client Name': ["TDS Receivable - AY 2025-26"],
                     'Policy No.': '',
                     'Risk': '',
@@ -15764,12 +15770,12 @@ def process_max_life_insurance(file_path, template_data, risk_code_data, cust_ne
                     'AccountTypeDuplicate': ['G/L Account'],
                     'Service Tax Ledger': ['2300022'],
                     'TDS Ledger': ['TDS Receivable - AY 2025-26'],
-                    'RepDate': processed_df['RepDate'].iloc[-1],
+                    'RepDate': processed_df['RepDate'].iloc[-1] if not processed_df.empty else datetime.today().strftime('%d-%b-%y'),
                     'Branch': '',
                     'Income Category': [''],
-                    'ASP Practice': [processed_df['ASP Practice'].iloc[-1]],
+                    'ASP Practice': [processed_df['ASP Practice'].iloc[-1] if not processed_df.empty else ''],
                     'P & L JV': [invoice_nos],
-                    'NPT2': processed_df['NPT2'].iloc[-1]
+                    'NPT2': processed_df['NPT2'].iloc[-1] if not processed_df.empty else ''
                 })
                 print("Created new row for GST not present case.")
 
@@ -15852,23 +15858,6 @@ def process_max_life_insurance(file_path, template_data, risk_code_data, cust_ne
     except Exception as e:
         print(f"Error processing Max Life Insurance Co. Ltd.: {str(e)}")
         raise
-
-
-import os
-import pandas as pd
-import numpy as np
-from datetime import datetime
-from dateutil import parser
-
-def parse_date_flexible(date_str):
-    """
-    Parses a date string into a datetime object.
-    Returns None if parsing fails.
-    """
-    try:
-        return parser.parse(date_str, dayfirst=False)
-    except (ValueError, TypeError):
-        return None
 
 def process_aditya_birla_sun_life(file_path, template_data, risk_code_data, cust_neft_data,
                                   table_3, table_4, table_5, subject, mappings):
@@ -15983,6 +15972,9 @@ def process_aditya_birla_sun_life(file_path, template_data, risk_code_data, cust
 
                     processed_df['Brokerage'] = processed_df[brokerage_columns].sum(axis=1)
                     print(f"Summed {brokerage_columns} into Brokerage.")
+            elif 'Brokerage' in processed_df.columns:
+                print("'Brokerage1' not in processed data but 'Brokerage' is present, using 'Brokerage' as is.")
+                # 'Brokerage' is already populated from mapping, we can proceed
             else:
                 print("'Brokerage1' column not in processed data, setting 'Brokerage' to empty.")
                 processed_df['Brokerage'] = ''
@@ -16011,6 +16003,9 @@ def process_aditya_birla_sun_life(file_path, template_data, risk_code_data, cust
 
                     processed_df['Premium'] = processed_df[premium_columns].sum(axis=1)
                     print(f"Summed {premium_columns} into Premium.")
+            elif 'Premium' in processed_df.columns:
+                print("'Premium1' not in processed data but 'Premium' is present, using 'Premium' as is.")
+                # 'Premium' is already populated from mapping, we can proceed
             else:
                 print("'Premium1' column not in processed data, setting 'Premium' to empty.")
                 processed_df['Premium'] = ''
@@ -16072,7 +16067,6 @@ def process_aditya_birla_sun_life(file_path, template_data, risk_code_data, cust
                 )
                 print("Processed 'P & L JV' based on 'Endorsement No.'")
             else:
-                processed_df['P & L JV'] = ''
                 print("'Endorsement No.' not in processed data, setting 'P & L JV' to empty.")
 
             # Remove rows where both 'Premium' and 'Brokerage' are 0
@@ -16271,10 +16265,10 @@ def process_aditya_birla_sun_life(file_path, template_data, risk_code_data, cust
                 # Ensure all scalar values are converted to lists of length 2
                 new_rows = pd.DataFrame({
                     'Entry No.': ['', ''],
-                    'Debtor Name': [processed_df['Debtor Name'].iloc[0]] * 2,
+                    'Debtor Name': [processed_df['Debtor Name'].iloc[0] if not processed_df.empty else ''] * 2,
                     'Nature of Transaction': ["GST Receipts", "Brokerage Statement"],
-                    'AccountType': [processed_df['AccountType'].iloc[0]] * 2,
-                    'Debtor Branch Ref': [processed_df['Debtor Branch Ref'].iloc[0]] * 2,
+                    'AccountType': [processed_df['AccountType'].iloc[0] if not processed_df.empty else ''] * 2,
+                    'Debtor Branch Ref': [processed_df['Debtor Branch Ref'].iloc[0] if not processed_df.empty else ''] * 2,
                     'Client Name': ["GST @ 18%", "TDS Receivable - AY 2025-26"],
                     'Policy No.': ['', ''],
                     'Risk': ['', ''],
@@ -16288,28 +16282,28 @@ def process_aditya_birla_sun_life(file_path, template_data, risk_code_data, cust
                     'Narration': [narration, narration],
                     'NPT': ['', ''],
                     'Bank Ledger': [bank_ledger_value, bank_ledger_value],
-                    'AccountTypeDuplicate': [processed_df['AccountTypeDuplicate'].iloc[0], 'G/L Account'],
+                    'AccountTypeDuplicate': [processed_df['AccountTypeDuplicate'].iloc[0] if not processed_df.empty else '', 'G/L Account'],
                     'Service Tax Ledger': [
-                        processed_df['Service Tax Ledger'].iloc[0],
+                        processed_df['Service Tax Ledger'].iloc[0] if not processed_df.empty else '',
                         '2300022'
                     ],
-                    'TDS Ledger': [processed_df['TDS Ledger'].iloc[0], 'TDS Receivable - AY 2025-26'],
-                    'RepDate': [processed_df['RepDate'].iloc[-1], processed_df['RepDate'].iloc[-1]],
+                    'TDS Ledger': [processed_df['TDS Ledger'].iloc[0] if not processed_df.empty else '', 'TDS Receivable - AY 2025-26'],
+                    'RepDate': [processed_df['RepDate'].iloc[-1] if not processed_df.empty else datetime.today().strftime('%d-%b-%y')] * 2,
                     'Branch': ['', ''],
                     'Income Category': ['', ''],
-                    'ASP Practice': [processed_df['ASP Practice'].iloc[-1], processed_df['ASP Practice'].iloc[-1]],
+                    'ASP Practice': [processed_df['ASP Practice'].iloc[-1] if not processed_df.empty else ''] * 2,
                     'P & L JV': [invoice_nos, invoice_nos],
-                    'NPT2': [processed_df['NPT2'].iloc[-1], processed_df['NPT2'].iloc[-1]]
+                    'NPT2': [processed_df['NPT2'].iloc[-1] if not processed_df.empty else ''] * 2
                 })
                 print("Created new rows for GST present case.")
             else:
                 # Ensure all scalar values are converted to lists of length 1
                 new_rows = pd.DataFrame({
                     'Entry No.': [''],
-                    'Debtor Name': [processed_df['Debtor Name'].iloc[0]],
+                    'Debtor Name': [processed_df['Debtor Name'].iloc[0] if not processed_df.empty else ''],
                     'Nature of Transaction': ["Brokerage Statement"],
-                    'AccountType': [processed_df['AccountType'].iloc[0]],
-                    'Debtor Branch Ref': [processed_df['Debtor Branch Ref'].iloc[0]],
+                    'AccountType': [processed_df['AccountType'].iloc[0] if not processed_df.empty else ''],
+                    'Debtor Branch Ref': [processed_df['Debtor Branch Ref'].iloc[0] if not processed_df.empty else ''],
                     'Client Name': ["TDS Receivable - AY 2025-26"],
                     'Policy No.': [''],
                     'Risk': [''],
@@ -16326,12 +16320,12 @@ def process_aditya_birla_sun_life(file_path, template_data, risk_code_data, cust
                     'AccountTypeDuplicate': ['G/L Account'],
                     'Service Tax Ledger': ['2300022'],
                     'TDS Ledger': ['TDS Receivable - AY 2025-26'],
-                    'RepDate': [processed_df['RepDate'].iloc[-1]],
+                    'RepDate': [processed_df['RepDate'].iloc[-1] if not processed_df.empty else datetime.today().strftime('%d-%b-%y')],
                     'Branch': [''],
                     'Income Category': [''],
-                    'ASP Practice': [processed_df['ASP Practice'].iloc[-1]],
+                    'ASP Practice': [processed_df['ASP Practice'].iloc[-1] if not processed_df.empty else ''],
                     'P & L JV': [invoice_nos],
-                    'NPT2': [processed_df['NPT2'].iloc[-1]]
+                    'NPT2': [processed_df['NPT2'].iloc[-1] if not processed_df.empty else '']
                 })
                 print("Created new row for GST not present case.")
 
