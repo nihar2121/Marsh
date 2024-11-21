@@ -11971,7 +11971,6 @@ def process_magma_hdi_general_insurance_company(file_path, template_data, risk_c
         print(f"Error processing Magma Hdi General Insurance Company: {str(e)}")
         raise
 
-
 def process_generali_india_insurance_company(file_path, template_data, risk_code_data, cust_neft_data,
                                              table_3, table_4, table_5, subject, mappings):
     try:
@@ -12065,7 +12064,7 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
                 brokerage3_mapped = 'Brokerage3' in processed_df.columns
 
                 if not brokerage2_mapped and not brokerage3_mapped:
-                    # If Brokerage2 and Brokerage3 are not mapped (because their attachment columns contained 'blank'), use Brokerage1 as Brokerage
+                    # If Brokerage2 and Brokerage3 are not mapped, use Brokerage1 as Brokerage
                     processed_df['Brokerage'] = processed_df['Brokerage1']
                     print("Brokerage2 and Brokerage3 mappings contained 'blank', using Brokerage1 as Brokerage.")
                 else:
@@ -12093,7 +12092,7 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
                 premium3_mapped = 'Premium3' in processed_df.columns
 
                 if not premium2_mapped and not premium3_mapped:
-                    # If Premium2 and Premium3 are not mapped (because their attachment columns contained 'blank'), use Premium1 as Premium
+                    # If Premium2 and Premium3 are not mapped, use Premium1 as Premium
                     processed_df['Premium'] = processed_df['Premium1']
                     print("Premium2 and Premium3 mappings contained 'blank', using Premium1 as Premium.")
                 else:
@@ -12113,8 +12112,6 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
             else:
                 print("'Premium1' column not in processed data, setting 'Premium' to empty.")
                 processed_df['Premium'] = ''
-
-            # For 'Risk' column, it's coming in, no further processing needed
 
             # 'Branch' needs lookup
             if 'Branch' in processed_df.columns:
@@ -12264,7 +12261,7 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
             net_amount_column = table_3.columns[-1]
             net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '-').str.replace(')', '')
             net_amount_values_numeric = pd.to_numeric(net_amount_values_cleaned, errors='coerce').fillna(0)
-            net_amount_value = net_amount_values_numeric.sum()
+            net_amount_value = net_amount_values_numeric.iloc[-1]  # Take last value instead of sum
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
             print(f"Net amount from 'table_3' is {net_amount_value}")
 
@@ -12369,7 +12366,7 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
                 tds_values_numeric = pd.to_numeric(tds_values_cleaned, errors='coerce').fillna(0)
                 invoice_nos = ', '.join(table_4['Invoice No'].dropna().astype(str).unique()) if 'Invoice No' in table_4.columns else ''
                 if len(tds_values_numeric) > 0:
-                    third_new_row_brokerage = tds_values_numeric.iloc[0]
+                    third_new_row_brokerage = tds_values_numeric.iloc[-1]
                 else:
                     third_new_row_brokerage = 0.0
                 third_new_row_brokerage = -abs(third_new_row_brokerage)
