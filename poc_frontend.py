@@ -8,7 +8,7 @@ import extract_msg  # To read .msg files
 from bs4 import BeautifulSoup
 import openpyxl
 # Importing the backend functions
-from poc_backend import process_pnb_metlife_insurance,process_pramerica_life_insurance,process_max_life_insurance,process_aditya_birla_sun_life ,process_sbi_life_insurance_co,process_iffco_tokyo_insurer,process_star_india_diachi,process_future_generalli_life_insurance,process_aditya_insurance_co,process_manipal_health_insurance_company,process_generali_india_insurance_company,process_magma_hdi_general_insurance_company,process_care_health_insurance_limited,process_bajaj_allianz_life_insurance,process_relaince_general_insurance_co, process_hdfc_ergo_insurance, process_bajaj_allianz_insurance,process_tata_aig_insurance,process_royal_sundaram_general_insurance,process_raheja_general_insurance,process_godigit_general_insurance,proess_acko_general_insurance,process_sbi_general_insurance,process_liberty_general_insurance,process_cholamandalam_general_insurance,process_icici_prudential_life_insurance,process_zuna_general_insurance, process_universal_sampo_insurance,process_kotak_mahindra_insurance,process_shriram_general_insurance,process_hdfc_life_insurance_co,process_star_health_insurer,read_lookup_files,process_icici_lombard_insurance, process_new_india_assurance,process_oriental_insurance_co, process_united_india_insurance,process_tata_aia_insurance
+from poc_backend import process_niva_bupa_health_insurance,process_go_digit_life_insurance,process_pnb_metlife_insurance,process_pramerica_life_insurance,process_max_life_insurance,process_aditya_birla_sun_life ,process_sbi_life_insurance_co,process_iffco_tokyo_insurer,process_star_india_diachi,process_future_generalli_life_insurance,process_aditya_insurance_co,process_manipal_health_insurance_company,process_generali_india_insurance_company,process_magma_hdi_general_insurance_company,process_care_health_insurance_limited,process_bajaj_allianz_life_insurance,process_relaince_general_insurance_co, process_hdfc_ergo_insurance, process_bajaj_allianz_insurance,process_tata_aig_insurance,process_royal_sundaram_general_insurance,process_raheja_general_insurance,process_godigit_general_insurance,proess_acko_general_insurance,process_sbi_general_insurance,process_liberty_general_insurance,process_cholamandalam_general_insurance,process_icici_prudential_life_insurance,process_zuna_general_insurance, process_universal_sampo_insurance,process_kotak_mahindra_insurance,process_shriram_general_insurance,process_hdfc_life_insurance_co,process_star_health_insurer,read_lookup_files,process_icici_lombard_insurance, process_new_india_assurance,process_oriental_insurance_co, process_united_india_insurance,process_tata_aia_insurance
 from datetime import datetime
 from urllib.parse import unquote_plus
 
@@ -1129,7 +1129,26 @@ def select_insurer():
                 '': 'P & L JV',
                 'Net Premium': 'Premium',
                 'Total Commission Amount': 'Brokerage'
+                                                      }
+        elif selected_insurer == 'Niva Bupa Health Insurance Company Limited (Previously Known As Max Bupa Health':
+
+            read_tables_from_email(email_body, selected_insurer)  # Pass the selected insurer to the function
+            default_mappings = {
+                'Product': 'Risk',
+                'Policy_Number': 'Policy No.',
+                'Customer': 'Client Name',
+                'Master Policy Holder Name': 'Client Name',
+                'Policy End Date': 'Policy End Date',
+                'Policy Start Date': 'Policy Start Date',
+                'mAX_bUPA_sTATE': 'Branch',
+                'Business_Type': 'Income Category',
+                'Endorsement Ind': 'Endorsement No.',
+                '': 'ASP Practice',
+                '': 'P & L JV',
+                'GWP_AMOUNT': 'Premium',
+                'Total_Comm_Amount': 'Brokerage'
                                                       }   
+
         else:
             # Ensure there's a fallback for other insurers
             default_mappings = {
@@ -1190,7 +1209,9 @@ def edit_mappings():
         'Aditya Birla Sun Life Insurance Company Limited':0,
         'Pramerica Life Insurance Limited':0,
         'Pnb Metlife India Insurance Company Ltd (Pre. Met Life India Insurance Company P':0,
-        'Go Digit Life Insurance Limited':0
+        'Go Digit Life Insurance Limited':0,
+        'Niva Bupa Health Insurance Company Limited (Previously Known As Max Bupa Health':0
+        
         # Add more insurers as needed
     }
 
@@ -1375,7 +1396,7 @@ def read_tables_from_email(email_body, selected_insurer):
         'The New India Assurance Co', 'The Oriental Insurance Co', 'United India Insurance',
         'ICICI Lombard General Insurance Co. Ltd.', 'Star Health Insurance', 'Hdfc Life Insurance Co. Ltd.',
         'Shriram General Insurance Company Limited', 'Kotak Mahindra General Insurance Company',
-        'Universal Sampo Insurance', 'Zuno General Insurance Limited', 'ICICI Prudential Life Insurance Co Ltd',
+        'Universal Sampo Insurance', 'Zuno General Insurance Limited', 'ICICI Prudential Life Insurance Co Ltd','Niva Bupa Health Insurance Company Limited (Previously Known As Max Bupa Health',
         'Go Digit Life Insurance Limited','Pnb Metlife India Insurance Company Ltd (Pre. Met Life India Insurance Company P','Pramerica Life Insurance Limited','Max Life Insurance Co. Ltd. ( Prev. Known As Max New York Life Insurance Co. Ltd','Aditya Birla Sun Life Insurance Company Limited','SBI Life Insurance Company Limited','IFFCO TOKIO General Insurance Co. Ltd.','Star Union Dai-Ichi Life Insurance Company Ltd','Future Generali India Life Insurance Co Ltd','Aditya Birla Health Insurance Co.Ltd.','Manipal Cigna Health Insurance Company Limited (Prev. Cigna Ttk Health Insurance','Future Generali India Insurance Company Limited','Magma Hdi General Insurance Company Limited','Care Health Insurance Limited','Bajaj Allianz Life Insurance Company Limited','Reliance General Insurance Co. Ltd.','Hdfc Ergo General Insurance Company Limited','Bajaj Allianz General Insurance Co. Ltd.','Tata AIG General Insurance Co. Ltd.','Royal Sundaram General Insurance Co Ltd','Raheja Qbe General Insurance Company Limited','GoDigit General Insurance Limited','Acko General Insurance Limited','SBI General Insurance Company Limited','Cholamandalam General Insurance Co. Ltd.', 'Tata AIA Insurance','Liberty Videocon General Insurance Co. Ltd'
     ]
 
