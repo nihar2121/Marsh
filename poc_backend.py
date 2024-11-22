@@ -8381,6 +8381,29 @@ def process_tata_aig_insurance(file_path, template_data, risk_code_data, cust_ne
                 lambda row: '' if row['Endorsement No.'] == '' else 'Endorsement', axis=1
             )
             # Branch lookup
+            if 'Branch' in processed_df.columns:
+                state_lookups_sheet2 = pd.read_excel(
+                    r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
+                    r'\Common folder AP & AR\Brokerage Statement Automation\support files'
+                    r'\state_lookups.xlsx',
+                    sheet_name='Sheet2',
+                )
+                state_lookups_sheet2['state'] = (
+                    state_lookups_sheet2['state'].astype(str).str.strip().str.lower()
+                )
+                state_lookups_sheet2['shortform'] = (
+                    state_lookups_sheet2['shortform'].astype(str).str.strip()
+                )
+                processed_df['Branch'] = (
+                    processed_df['Branch'].astype(str).str.strip().str.lower()
+                )
+                branch_lookup = state_lookups_sheet2.set_index('state')[
+                    'shortform'
+                ].to_dict()
+                processed_df['Branch'] = processed_df['Branch'].map(branch_lookup).fillna('')
+            else:
+                processed_df['Branch'] = ''
+
 
             if 'Endorsement No.' in processed_df.columns:
                 def process_endorsement(row):
@@ -8875,7 +8898,29 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
                 processed_df['Brokerage Rate'] = processed_df.apply(calc_brokerage_rate, axis=1)
                 processed_df['Brokerage Rate'] = processed_df['Brokerage Rate'].apply(lambda x: "{0:.2f}".format(x))
 
-            # For 'Branch' column, map using 'state_lookups.xlsx' 'Sheet2'
+            if 'Branch' in processed_df.columns:
+                state_lookups_sheet2 = pd.read_excel(
+                    r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
+                    r'\Common folder AP & AR\Brokerage Statement Automation\support files'
+                    r'\state_lookups.xlsx',
+                    sheet_name='Sheet2',
+                )
+                state_lookups_sheet2['state'] = (
+                    state_lookups_sheet2['state'].astype(str).str.strip().str.lower()
+                )
+                state_lookups_sheet2['shortform'] = (
+                    state_lookups_sheet2['shortform'].astype(str).str.strip()
+                )
+                processed_df['Branch'] = (
+                    processed_df['Branch'].astype(str).str.strip().str.lower()
+                )
+                branch_lookup = state_lookups_sheet2.set_index('state')[
+                    'shortform'
+                ].to_dict()
+                processed_df['Branch'] = processed_df['Branch'].map(branch_lookup).fillna('')
+            else:
+                processed_df['Branch'] = ''
+
             if 'P & L JV' in processed_df.columns:
                 endorsement_type_mapping = pd.read_excel(
                     r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
@@ -9117,7 +9162,7 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
                     'RepDate': processed_df['RepDate'].iloc[-1],
                     'Branch': '',
                     'Income category': ['', ''],
-                    'ASP Practice': processed_df['ASP Practice'].iloc[-1],
+                    'ASP Practice': ['', ''],
                     'P & L JV': [invoice_nos, invoice_nos],
                     'NPT2': processed_df['NPT2'].iloc[-1]
                 })
@@ -9148,7 +9193,7 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
                     'RepDate': processed_df['RepDate'].iloc[-1],
                     'Branch': '',
                     'Income category': [''],
-                    'ASP Practice': [processed_df['ASP Practice'].iloc[-1]],
+                    'ASP Practice': [''],
                     'P & L JV': [invoice_nos],
                     'NPT2': processed_df['NPT2'].iloc[-1]
                 })
@@ -9445,16 +9490,35 @@ def process_hdfc_ergo_insurance(file_path, template_data, risk_code_data, cust_n
             else:
                 processed_df['P & L JV'] = ''
 
-            processed_df['P & L JV'] = processed_df.apply(
-                lambda row: '' if row['Endorsement No.'] == '' else 'Endorsement', axis=1
-            )
-            # Branch lookup
+            if 'Branch' in processed_df.columns:
+                state_lookups_sheet2 = pd.read_excel(
+                    r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
+                    r'\Common folder AP & AR\Brokerage Statement Automation\support files'
+                    r'\state_lookups.xlsx',
+                    sheet_name='Sheet2',
+                )
+                state_lookups_sheet2['state'] = (
+                    state_lookups_sheet2['state'].astype(str).str.strip().str.lower()
+                )
+                state_lookups_sheet2['shortform'] = (
+                    state_lookups_sheet2['shortform'].astype(str).str.strip()
+                )
+                processed_df['Branch'] = (
+                    processed_df['Branch'].astype(str).str.strip().str.lower()
+                )
+                branch_lookup = state_lookups_sheet2.set_index('state')[
+                    'shortform'
+                ].to_dict()
+                processed_df['Branch'] = processed_df['Branch'].map(branch_lookup).fillna('')
+            else:
+                processed_df['Branch'] = ''
+
 
             if 'Endorsement No.' in processed_df.columns:
                 def process_endorsement(row):
                     endorsement_no = str(row['Endorsement No.']).strip()
                     p_l_jv = str(row.get('P & L JV', '')).strip()
-                    if endorsement_no == '0':
+                    if endorsement_no in ('0', '00', '000'):
                         row['Endorsement No.'] = ''
                         row['P & L JV'] = ''
                     else:
@@ -14553,17 +14617,90 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
             print(f"GST present: {gst_present}")
 
             # Create narration with or without 'GST'
-            if gst_present:
-                narration = (
-                    f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs."
-                    f"{net_value:.2f} from {supplier_name_col} with GST 18%"
-                )
+            # Create narration considering GST and value in brackets
+            net_amount_column = table_3.columns[0]  # First column
+            net_amount_value_raw = table_3[net_amount_column].iloc[0]
+            net_amount_value_cleaned = str(net_amount_value_raw).replace(',', '').replace('(', '-').replace(')', '')
+            net_amount_value = float(net_amount_value_cleaned) if net_amount_value_cleaned else 0.0
+            net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
+            print(f"Net amount from 'table_3' is {net_amount_value}")
+
+            # Check if sum_brokerage is approximately equal to net_amount_value
+            brokerage_equals_net_amount = np.isclose(sum_brokerage, net_amount_value, atol=0.01)
+            print(f"Does sum of 'Brokerage' equal net amount from 'table_3'? {brokerage_equals_net_amount}")
+
+            # Get details from 'table_4'
+            amount_values_cleaned = table_4['Amount'].astype(str).str.replace(',', '').str.replace('(', '-').str.replace(')', '')
+            amount_values_numeric = pd.to_numeric(amount_values_cleaned, errors='coerce').fillna(0)
+            amount_total = amount_values_numeric.sum()
+            narration_value_original = "{:,.2f}".format(amount_total)
+            print(f"Total amount from 'table_4' is {amount_total}")
+
+            bank_value = table_4['Bank'].iloc[0] if 'Bank' in table_4.columns else ''
+            date_col = table_4['Date'].iloc[0] if 'Date' in table_4.columns else datetime.today().strftime('%d/%m/%Y')
+            insurer_name = table_4['Insurer Name'].iloc[0] if 'Insurer Name' in table_4.columns else ''
+            if 'Narration' in table_4.columns and not table_4['Narration'].empty:
+                narration_from_table_4 = table_4['Narration'].iloc[0]
+            elif 'Narration (Ref)' in table_4.columns and not table_4['Narration (Ref)'].empty:
+                narration_from_table_4 = table_4['Narration (Ref)'].iloc[0]
             else:
-                narration = (
-                    f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs."
-                    f"{net_value:.2f} from {supplier_name_col} without GST 18%"
-                )
-            print(f"Narration set: '{narration}'")
+                narration_from_table_4 = ''
+            print(f"Narration from 'table_4': {narration_from_table_4}")
+
+            # Get 'GST' presence in 'table_3' columns
+            gst_present = any('GST' in col or 'GST @18%' in col for col in table_3.columns)
+            print(f"Is GST present in 'table_3' columns? {gst_present}")
+
+            # Remove special characters from 'Narration' for file naming
+            safe_narration = ''.join(e for e in narration_from_table_4 if e.isalnum() or e == ' ').strip()
+            print(f"Safe narration for file naming: {safe_narration}")
+
+            # Get 'Debtor Branch Ref' from 'cust_neft_data' using 'Insurer Name'
+            debtor_branch_ref_row = cust_neft_data[cust_neft_data['Name'].str.lower() == insurer_name.lower()]
+            if not debtor_branch_ref_row.empty:
+                debtor_branch_ref = debtor_branch_ref_row['No.2'].iloc[0]
+                print(f"Found 'Debtor Branch Ref' for insurer '{insurer_name}': {debtor_branch_ref}")
+            else:
+                debtor_branch_ref = ''
+                print(f"No 'Debtor Branch Ref' found for insurer '{insurer_name}', setting to empty.")
+            processed_df['Debtor Branch Ref'] = debtor_branch_ref
+            processed_df['Service Tax Ledger'] = processed_df['Debtor Branch Ref'].str.replace('CUST_NEFT_', '')
+            processed_df['Debtor Name'] = insurer_name
+            print("Updated 'Debtor Branch Ref', 'Service Tax Ledger', 'Debtor Name' in processed data.")
+
+            # Convert date to dd/mm/yyyy format
+            date_col_formatted = pd.to_datetime(date_col).strftime('%d/%m/%Y')
+            print(f"Formatted date: {date_col_formatted}")
+
+            # Get 'supplier_name_col' from 'table_4'
+            supplier_name_col = ''
+            for col in ['Insurer Name', 'Insurer', 'SupplierName']:
+                if col in table_4.columns and not table_4[col].empty:
+                    supplier_name_col = table_4[col].iloc[0]
+                    break
+            print(f"Supplier name from 'table_4': {supplier_name_col}")
+
+            # Create narration considering GST and value in brackets
+            narration_value_numeric = float(narration_value_original.replace(',', ''))
+            net_amount_value_rounded = round(net_amount_value, 2)
+
+            # Adjust the tolerance based on the magnitude of the amounts
+            tolerance = max(abs(narration_value_numeric), abs(net_amount_value_rounded)) * 1e-5
+
+            if gst_present:
+                if not np.isclose(narration_value_numeric, net_amount_value_rounded, atol=tolerance):
+                    narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} ({net_amount_value_formatted}) from {supplier_name_col} with GST 18%"
+                else:
+                    narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} with GST 18%"
+            else:
+                if not np.isclose(narration_value_numeric, net_amount_value_rounded, atol=tolerance):
+                    narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} ({net_amount_value_formatted}) from {supplier_name_col} without GST 18%"
+                else:
+                    narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} without GST 18%"
+            processed_df['Narration'] = narration
+            print(f"Narration set in processed data: {narration}")
+
+
 
             # Set 'Narration' in df_section
             df_section['Narration'] = narration
