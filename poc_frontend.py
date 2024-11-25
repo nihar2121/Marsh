@@ -612,7 +612,9 @@ def select_insurer():
                 'GROSS': 'Premium',
                 'TOTAL COMM': 'Brokerage',
                 'S Divisionname': 'Branch',
-                'S Fresh Renewal': 'Income category'
+                'S Fresh Renewal': 'Income category',
+                'S Endorsementno':'Endorsement No.'
+
             }
         elif selected_insurer == 'Kotak Mahindra General Insurance Company':
 
@@ -1039,7 +1041,7 @@ def select_insurer():
             default_mappings = {
                 'Detailed Product Name': 'Risk',
                 'Policy No.': 'Policy No.',
-                'Client Name': 'Client Name',
+                'Client Names': 'Client Name',
                 'EDC To': 'Policy End Date',
                 'EDC From': 'Policy Start Date',
                 'Nature of Premium (SP / FY / RW)': 'Income Category',

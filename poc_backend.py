@@ -2768,21 +2768,23 @@ def process_shriram_general_insurance(file_path, template_data, risk_code_data, 
                 processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
                 processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
-        if 'Policy No.' in processed_df.columns:
-            # Extract numbers after last '/'
-            def extract_endorsement_no(policy_no):
-                if pd.isnull(policy_no):
-                    return ''
-                policy_no_str = str(policy_no)
-                parts = policy_no_str.split('/')
-                if len(parts) > 1:
-                    endorsement_no = parts[-1]
-                    if endorsement_no == '000':
+        if processed_df['Endorsement No.'] is not blank:
+            if 'Policy No.' in processed_df.columns:
+                # Extract numbers after last '/'
+                def extract_endorsement_no(policy_no):
+                    if pd.isnull(policy_no):
                         return ''
+                    policy_no_str = str(policy_no)
+                    parts = policy_no_str.split('/')
+                    if len(parts) > 1:
+                        endorsement_no = parts[-1]
+                        if endorsement_no == '000':
+                            return ''
+                        else:
+                            return endorsement_no
                     else:
-                        return endorsement_no
-                else:
-                    return ''
+                        return ''
+        else:
             processed_df['Endorsement No.'] = processed_df['Policy No.'].apply(extract_endorsement_no)
 
         # For 'P & L JV' column, map 'ENDORSEMENT_TYPE' or 'POL_ENDORSEMENT_TYPE' to 'P & L JV'
@@ -5138,8 +5140,13 @@ def process_cholamandalam_general_insurance(file_path, template_data, risk_code_
             net_amount_column = table_3.columns[-1]
             net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
             net_amount_values_numeric = pd.to_numeric(net_amount_values_cleaned, errors='coerce').fillna(0)
-            net_amount_value = net_amount_values_numeric.sum()
+            # Modification: Take the first value instead of sum
+            if len(net_amount_values_numeric) > 0:
+                net_amount_value = net_amount_values_numeric.iloc[0]
+            else:
+                net_amount_value = 0.0
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
+            print(f"Net amount from 'table_3' is {net_amount_value}")
             # Check if sum_brokerage is approximately equal to net_amount_value
             brokerage_equals_net_amount = np.isclose(sum_brokerage, net_amount_value, atol=0.01)
             # Get details from 'table_4'
@@ -5568,8 +5575,13 @@ def process_liberty_general_insurance(file_path, template_data, risk_code_data, 
             net_amount_column = table_3.columns[-1]
             net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
             net_amount_values_numeric = pd.to_numeric(net_amount_values_cleaned, errors='coerce').fillna(0)
-            net_amount_value = net_amount_values_numeric.sum()
+            # Modification: Take the first value instead of sum
+            if len(net_amount_values_numeric) > 0:
+                net_amount_value = net_amount_values_numeric.iloc[0]
+            else:
+                net_amount_value = 0.0
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
+            print(f"Net amount from 'table_3' is {net_amount_value}")
 
             # Check if sum_brokerage is approximately equal to net_amount_value
             brokerage_equals_net_amount = np.isclose(sum_brokerage, net_amount_value, atol=0.01)
@@ -6022,8 +6034,13 @@ def proess_acko_general_insurance(file_path, template_data, risk_code_data, cust
             net_amount_column = table_3.columns[-1]
             net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
             net_amount_values_numeric = pd.to_numeric(net_amount_values_cleaned, errors='coerce').fillna(0)
-            net_amount_value = net_amount_values_numeric.sum()
+            # Modification: Take the first value instead of sum
+            if len(net_amount_values_numeric) > 0:
+                net_amount_value = net_amount_values_numeric.iloc[0]
+            else:
+                net_amount_value = 0.0
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
+            print(f"Net amount from 'table_3' is {net_amount_value}")
 
             # Check if sum_brokerage is approximately equal to net_amount_value
             brokerage_equals_net_amount = np.isclose(sum_brokerage, net_amount_value, atol=0.01)
@@ -6499,8 +6516,13 @@ def process_sbi_general_insurance(file_path, template_data, risk_code_data, cust
             net_amount_column = table_3.columns[-1]
             net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
             net_amount_values_numeric = pd.to_numeric(net_amount_values_cleaned, errors='coerce').fillna(0)
-            net_amount_value = net_amount_values_numeric.sum()
+            # Modification: Take the first value instead of sum
+            if len(net_amount_values_numeric) > 0:
+                net_amount_value = net_amount_values_numeric.iloc[0]
+            else:
+                net_amount_value = 0.0
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
+            print(f"Net amount from 'table_3' is {net_amount_value}")
 
             # Check if sum_brokerage is approximately equal to net_amount_value
             brokerage_equals_net_amount = np.isclose(sum_brokerage, net_amount_value, atol=0.01)
@@ -6965,10 +6987,15 @@ def process_godigit_general_insurance(file_path, template_data, risk_code_data, 
 
             # Get 'Net Amount' from 'table_3'
             net_amount_column = table_3.columns[-1]
-            net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '-').str.replace(')', '')
+            net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
             net_amount_values_numeric = pd.to_numeric(net_amount_values_cleaned, errors='coerce').fillna(0)
-            net_amount_value = net_amount_values_numeric.sum()
+            # Modification: Take the first value instead of sum
+            if len(net_amount_values_numeric) > 0:
+                net_amount_value = net_amount_values_numeric.iloc[0]
+            else:
+                net_amount_value = 0.0
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
+            print(f"Net amount from 'table_3' is {net_amount_value}")
 
             # Check if sum_brokerage is approximately equal to net_amount_value
             brokerage_equals_net_amount = np.isclose(sum_brokerage, net_amount_value, atol=0.01)
@@ -7489,10 +7516,16 @@ def process_raheja_general_insurance(file_path, template_data, risk_code_data, c
 
             # Get 'Net Amount' from 'table_3'
             net_amount_column = table_3.columns[-1]
-            net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '-').str.replace(')', '')
+            net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
             net_amount_values_numeric = pd.to_numeric(net_amount_values_cleaned, errors='coerce').fillna(0)
-            net_amount_value = net_amount_values_numeric.sum()
+            # Modification: Take the first value instead of sum
+            if len(net_amount_values_numeric) > 0:
+                net_amount_value = net_amount_values_numeric.iloc[0]
+            else:
+                net_amount_value = 0.0
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
+            print(f"Net amount from 'table_3' is {net_amount_value}")
+
 
             # Check if sum_brokerage is approximately equal to net_amount_value
             brokerage_equals_net_amount = np.isclose(sum_brokerage, net_amount_value, atol=0.01)
@@ -7964,8 +7997,13 @@ def process_royal_sundaram_general_insurance(file_path, template_data, risk_code
             net_amount_column = table_3.columns[-1]
             net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
             net_amount_values_numeric = pd.to_numeric(net_amount_values_cleaned, errors='coerce').fillna(0)
-            net_amount_value = net_amount_values_numeric.sum()
+            # Modification: Take the first value instead of sum
+            if len(net_amount_values_numeric) > 0:
+                net_amount_value = net_amount_values_numeric.iloc[0]
+            else:
+                net_amount_value = 0.0
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
+            print(f"Net amount from 'table_3' is {net_amount_value}")
 
             # Check if sum_brokerage is approximately equal to net_amount_value
             brokerage_equals_net_amount = np.isclose(sum_brokerage, net_amount_value, atol=0.01)
@@ -8487,6 +8525,7 @@ def process_tata_aig_insurance(file_path, template_data, risk_code_data, cust_ne
             else:
                 net_amount_value = 0.0
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
+            print(f"Net amount from 'table_3' is {net_amount_value}")
 
             # Check if sum_brokerage is approximately equal to net_amount_value
             brokerage_equals_net_amount = np.isclose(sum_brokerage, net_amount_value, atol=0.01)
@@ -9037,6 +9076,7 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
             else:
                 net_amount_value = 0.0
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
+            print(f"Net amount from 'table_3' is {net_amount_value}")
 
             # Check if sum_brokerage is approximately equal to net_amount_value
             brokerage_equals_net_amount = np.isclose(sum_brokerage, net_amount_value, atol=0.01)
@@ -9596,7 +9636,7 @@ def process_hdfc_ergo_insurance(file_path, template_data, risk_code_data, cust_n
             else:
                 net_amount_value = 0.0
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
-
+            print(f"Net amount from 'table_3' is {net_amount_value}")
             # Check if sum_brokerage is approximately equal to net_amount_value
             brokerage_equals_net_amount = np.isclose(sum_brokerage, net_amount_value, atol=0.01)
 
@@ -10111,6 +10151,7 @@ def process_relaince_general_insurance_co(file_path, template_data, risk_code_da
             else:
                 net_amount_value = 0.0
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
+            print(f"Net amount from 'table_3' is {net_amount_value}")
 
             # Check if sum_brokerage is approximately equal to net_amount_value
             brokerage_equals_net_amount = np.isclose(sum_brokerage, net_amount_value, atol=0.01)
@@ -10673,6 +10714,7 @@ def process_bajaj_allianz_life_insurance(file_path, template_data, risk_code_dat
             else:
                 net_amount_value = 0.0
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
+            print(f"Net amount from 'table_3' is {net_amount_value}")
 
             # Check if sum_brokerage is approximately equal to net_amount_value
             brokerage_equals_net_amount = np.isclose(sum_brokerage, net_amount_value, atol=0.01)
@@ -11159,6 +11201,7 @@ def process_care_health_insurance_limited(file_path, template_data, risk_code_da
             else:
                 net_amount_value = 0.0
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
+            print(f"Net amount from 'table_3' is {net_amount_value}")
 
             # Check if sum_brokerage is approximately equal to net_amount_value
             brokerage_equals_net_amount = np.isclose(sum_brokerage, net_amount_value, atol=0.01)
@@ -11774,9 +11817,13 @@ def process_magma_hdi_general_insurance_company(file_path, template_data, risk_c
 
             # Get 'Net Amount' from 'table_3'
             net_amount_column = table_3.columns[-1]
-            net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '-').str.replace(')', '')
+            net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
             net_amount_values_numeric = pd.to_numeric(net_amount_values_cleaned, errors='coerce').fillna(0)
-            net_amount_value = net_amount_values_numeric.sum()
+            # Modification: Take the first value instead of sum
+            if len(net_amount_values_numeric) > 0:
+                net_amount_value = net_amount_values_numeric.iloc[0]
+            else:
+                net_amount_value = 0.0
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
             print(f"Net amount from 'table_3' is {net_amount_value}")
 
@@ -12323,10 +12370,15 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
 
             # Get 'Net Amount' from 'table_3'
             # Updated code: Take the value from the first row of the first column
-            net_amount_column = table_3.columns[0]  # First column
-            net_amount_value_raw = table_3[net_amount_column].iloc[0]
-            net_amount_value_cleaned = str(net_amount_value_raw).replace(',', '').replace('(', '-').replace(')', '')
-            net_amount_value = float(net_amount_value_cleaned) if net_amount_value_cleaned else 0.0
+            # Get 'Net Amount' from 'table_3'
+            net_amount_column = table_3.columns[-1]
+            net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
+            net_amount_values_numeric = pd.to_numeric(net_amount_values_cleaned, errors='coerce').fillna(0)
+            # Modification: Take the first value instead of sum
+            if len(net_amount_values_numeric) > 0:
+                net_amount_value = net_amount_values_numeric.iloc[0]
+            else:
+                net_amount_value = 0.0
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
             print(f"Net amount from 'table_3' is {net_amount_value}")
 
@@ -12863,11 +12915,16 @@ def process_manipal_health_insurance_company(file_path, template_data, risk_code
 
             # Get 'Net Amount' from 'table_3'
             net_amount_column = table_3.columns[-1]
-            net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '-').str.replace(')', '')
+            net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
             net_amount_values_numeric = pd.to_numeric(net_amount_values_cleaned, errors='coerce').fillna(0)
-            net_amount_value = net_amount_values_numeric.sum()
+            # Modification: Take the first value instead of sum
+            if len(net_amount_values_numeric) > 0:
+                net_amount_value = net_amount_values_numeric.iloc[0]
+            else:
+                net_amount_value = 0.0
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
             print(f"Net amount from 'table_3' is {net_amount_value}")
+
 
             # Check if sum_brokerage is approximately equal to net_amount_value
             brokerage_equals_net_amount = np.isclose(sum_brokerage, net_amount_value, atol=0.01)
@@ -13394,7 +13451,7 @@ def process_aditya_insurance_co(file_path, template_data, risk_code_data, cust_n
             print(f"Sum of 'Brokerage' is {sum_brokerage}")
 
             # Get 'Net Amount' from 'table_3'
-            net_amount_column = table_3.columns[-1]
+            net_amount_column = table_3.columns[1] if table_3.columns[0].startswith('Unnamed:') else table_3.columns[0]
             net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '-').str.replace(')', '')
             net_amount_values_numeric = pd.to_numeric(net_amount_values_cleaned, errors='coerce').fillna(0)
             net_amount_value = net_amount_values_numeric.sum()
@@ -14618,12 +14675,17 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
 
             # Create narration with or without 'GST'
             # Create narration considering GST and value in brackets
-            net_amount_column = table_3.columns[0]  # First column
-            net_amount_value_raw = table_3[net_amount_column].iloc[0]
-            net_amount_value_cleaned = str(net_amount_value_raw).replace(',', '').replace('(', '-').replace(')', '')
-            net_amount_value = float(net_amount_value_cleaned) if net_amount_value_cleaned else 0.0
+            net_amount_column = table_3.columns[-1]
+            net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
+            net_amount_values_numeric = pd.to_numeric(net_amount_values_cleaned, errors='coerce').fillna(0)
+            # Modification: Take the first value instead of sum
+            if len(net_amount_values_numeric) > 0:
+                net_amount_value = net_amount_values_numeric.iloc[0]
+            else:
+                net_amount_value = 0.0
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
             print(f"Net amount from 'table_3' is {net_amount_value}")
+
 
             # Check if sum_brokerage is approximately equal to net_amount_value
             brokerage_equals_net_amount = np.isclose(sum_brokerage, net_amount_value, atol=0.01)
@@ -15200,7 +15262,7 @@ def process_iffco_tokyo_insurer(file_path, template_data, risk_code_data, cust_n
             print(f"Sum of 'Brokerage' is {sum_brokerage}")
 
             # Get 'Net Amount' from 'table_3'
-            net_amount_column = table_3.columns[-1]
+            net_amount_column = table_3.columns[1] if table_3.columns[0].startswith('Unnamed:') else table_3.columns[0]
             net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '-').str.replace(')', '')
             net_amount_values_numeric = pd.to_numeric(net_amount_values_cleaned, errors='coerce').fillna(0)
             net_amount_value = net_amount_values_numeric.sum()
@@ -15778,7 +15840,7 @@ def process_max_life_insurance(file_path, template_data, risk_code_data, cust_ne
             print(f"Sum of 'Brokerage' is {sum_brokerage}")
 
             # Get 'Net Amount' from 'table_3'
-            net_amount_column = table_3.columns[-1]
+            net_amount_column = table_3.columns[1] if table_3.columns[0].startswith('Unnamed:') else table_3.columns[0]
             net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '-').str.replace(')', '')
             net_amount_values_numeric = pd.to_numeric(net_amount_values_cleaned, errors='coerce').fillna(0)
             net_amount_value = net_amount_values_numeric.sum()
@@ -16355,10 +16417,15 @@ def process_aditya_birla_sun_life(file_path, template_data, risk_code_data, cust
             print(f"Sum of 'Brokerage' is {sum_brokerage}")
 
             # Get 'Net Amount' from 'table_3'
+            # Get 'Net Amount' from 'table_3'
             net_amount_column = table_3.columns[-1]
-            net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '-').str.replace(')', '')
+            net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
             net_amount_values_numeric = pd.to_numeric(net_amount_values_cleaned, errors='coerce').fillna(0)
-            net_amount_value = net_amount_values_numeric.sum()
+            # Modification: Take the first value instead of sum
+            if len(net_amount_values_numeric) > 0:
+                net_amount_value = net_amount_values_numeric.iloc[0]
+            else:
+                net_amount_value = 0.0
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
             print(f"Net amount from 'table_3' is {net_amount_value}")
 
@@ -17522,7 +17589,7 @@ def process_pramerica_life_insurance(file_path, template_data, risk_code_data, c
             print(f"Sum of 'Brokerage' is {sum_brokerage}")
 
             # Get 'Net Amount' from 'table_3'
-            net_amount_column = table_3.columns[-1]
+            net_amount_column = table_3.columns[1] if not table_3.columns[0].strip() else table_3.columns[0]
             net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '-').str.replace(')', '')
             net_amount_values_numeric = pd.to_numeric(net_amount_values_cleaned, errors='coerce').fillna(0)
             net_amount_value = net_amount_values_numeric.sum()
@@ -18103,11 +18170,14 @@ def process_pnb_metlife_insurance(file_path, template_data, risk_code_data, cust
             sum_brokerage = processed_df['Brokerage'].astype(float).sum()
             print(f"Sum of 'Brokerage' is {sum_brokerage}")
 
-            # Get 'Net Amount' from 'table_3'
             net_amount_column = table_3.columns[-1]
-            net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '-').str.replace(')', '')
+            net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
             net_amount_values_numeric = pd.to_numeric(net_amount_values_cleaned, errors='coerce').fillna(0)
-            net_amount_value = net_amount_values_numeric.sum()
+            # Modification: Take the first value instead of sum
+            if len(net_amount_values_numeric) > 0:
+                net_amount_value = net_amount_values_numeric.iloc[0]
+            else:
+                net_amount_value = 0.0
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
             print(f"Net amount from 'table_3' is {net_amount_value}")
 
@@ -19066,6 +19136,7 @@ def process_niva_bupa_health_insurance(file_path, template_data, risk_code_data,
             else:
                 net_amount_value = 0.0
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
+            print(f"Net amount from 'table_3' is {net_amount_value}")
 
             # Check if sum_brokerage is approximately equal to net_amount_value
             brokerage_equals_net_amount = np.isclose(sum_brokerage, net_amount_value, atol=0.01)
