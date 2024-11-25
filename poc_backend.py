@@ -18926,11 +18926,6 @@ def process_go_digit_life_insurance(file_path, template_data, risk_code_data, cu
         print(f"Error processing Go Digit Life Insurance: {str(e)}")
         raise
 
-import os
-import pandas as pd
-import numpy as np
-from datetime import datetime
-
 def process_niva_bupa_health_insurance(file_path, template_data, risk_code_data, cust_neft_data,
                                        table_3, table_4, table_5, subject, mappings):
     try:
@@ -19380,4 +19375,464 @@ def process_niva_bupa_health_insurance(file_path, template_data, risk_code_data,
 
     except Exception as e:
         print(f"Error processing Niva Bupa Health Insurance: {str(e)}")
+        raise
+
+def process_edelweiss_tokio_life_insurance(file_path, template_data, risk_code_data, cust_neft_data,
+                                           table_3, table_4, table_5, subject, mappings):
+    try:
+        # Read the file based on its extension, including xlsb files
+        file_extension = os.path.splitext(file_path)[1].lower()
+        if file_extension == '.xlsx':
+            data = pd.read_excel(file_path, header=0)
+        elif file_extension == '.xlsb':
+            data = pd.read_excel(file_path, engine='pyxlsb', header=0)
+        elif file_extension == '.csv':
+            data = pd.read_csv(file_path, header=0)
+        elif file_extension == '.ods':
+            data = pd.read_excel(file_path, engine='odf', header=0)
+        elif file_extension == '.txt':
+            data = pd.read_csv(file_path, delimiter='\t', header=0)
+        elif file_extension == '.xls':
+            data = pd.read_excel(file_path, engine='xlrd', header=0)
+        else:
+            raise ValueError("Unsupported file format")
+
+        print(data.head(10))
+
+        # Remove empty rows to avoid empty dataframes
+        data = data.dropna(how='all').reset_index(drop=True)
+        data = data[data.apply(lambda row: row.count() > 4, axis=1)].reset_index(drop=True)
+        print(data.head(10))
+
+        # Remove rows where any column contains 'Grand Total'
+        data = data[~data.apply(lambda row: row.astype(str).str.contains('Grand Total', case=False, na=False).any(), axis=1)].reset_index(drop=True)
+
+        # Handle repeating header rows and split data into sections
+        columns = data.columns.tolist()
+        columns_cleaned = [str(col).strip().lower() for col in columns]  # Cleaned column names for comparison
+
+        header_indices = []
+        for i, row in data.iterrows():
+            # Convert all row values to string, strip whitespace, and lowercase
+            row_values = row.astype(str).str.strip().str.lower().tolist()
+            if row_values == columns_cleaned:
+                header_indices.append(i)
+
+        if not header_indices:
+            # If no repeating headers are found, treat entire data as one section
+            sections = [data]
+        else:
+            header_indices.append(len(data))  # Add the end index
+            sections = []
+            for idx in range(len(header_indices) - 1):
+                start_idx = header_indices[idx] + 1
+                end_idx = header_indices[idx + 1]
+                section_df = data.iloc[start_idx:end_idx].reset_index(drop=True)
+                # Assign the original column names
+                section_df.columns = columns
+                sections.append(section_df)
+        # ---- Updated Splitting Logic Ends Here ----
+
+        processed_sections = []
+        for idx, section in enumerate(sections):
+            # Clean column names and data
+            section.columns = section.columns.str.strip()
+            section = section.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+            # Process mappings from frontend (attachment columns on left, template columns on right)
+            if mappings:
+                # Create a DataFrame to hold mapped data
+                mapped_df = pd.DataFrame()
+                for attachment_col, template_col in mappings.items():
+                    if attachment_col in section.columns:
+                        mapped_df[template_col] = section[attachment_col]
+                    else:
+                        mapped_df[template_col] = ''
+            else:
+                mapped_df = section.copy()  # Proceed without mappings if not provided
+
+            # ---- Data Processing Logic Starts Here ----
+            # Since there are no Brokerage1, Brokerage2, Brokerage3, handle Brokerage normally
+            if 'Brokerage' in mapped_df.columns and 'Premium' in mapped_df.columns:
+                processed_df = mapped_df.copy()
+                processed_df = processed_df[processed_df['Brokerage'].notna() & (processed_df['Brokerage'] != '')].reset_index(drop=True)
+                if not processed_df.empty:
+                    # Calculate 'Brokerage Rate' as (Brokerage / Premium) * 100, rounded to 2 decimals
+                    def calc_brokerage_rate(row):
+                        try:
+                            brokerage = float(str(row['Brokerage']).replace(',', '').replace('(', '').replace(')', ''))
+                            premium = float(str(row['Premium']).replace(',', '').replace('(', '').replace(')', ''))
+                            if premium != 0:
+                                return round((brokerage / premium) * 100, 2)
+                            else:
+                                return 0
+                        except:
+                            return 0
+                    processed_df['Brokerage Rate'] = processed_df.apply(calc_brokerage_rate, axis=1)
+                    processed_df['Brokerage Rate'] = processed_df['Brokerage Rate'].apply(lambda x: "{0:.2f}".format(x))
+            else:
+                processed_df = mapped_df.copy()
+
+            # ---- Data Processing Logic Ends Here ----
+
+            # Handle dates in 'Policy Start Date' and 'Policy End Date' columns after mappings
+            date_columns = ['Policy Start Date', 'Policy End Date']
+            for column in date_columns:
+                if column in processed_df.columns and not processed_df[column].empty:
+                    processed_df[column] = processed_df[column].apply(parse_date_flexible)
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
+
+            # Since Risk lookup is not required, we keep 'Risk' as per the mapping
+
+            if 'Endorsement No.' in processed_df.columns and 'P & L JV' in processed_df.columns:
+                def process_endorsement(row):
+                    endorsement_no = str(row['Endorsement No.']).strip()
+                    if endorsement_no in ['0', '00', '000']:
+                        row['Endorsement No.'] = ''
+                        row['P & L JV'] = ''
+                    elif endorsement_no.upper() == 'G01 1':
+                        row['P & L JV'] = ''
+                    elif endorsement_no != '':
+                        row['P & L JV'] = 'Endorsement'
+                    else:
+                        row['P & L JV'] = ''
+                    return row
+                processed_df = processed_df.apply(process_endorsement, axis=1)
+
+            # Branch lookup
+            if 'Branch' in processed_df.columns:
+                state_lookups_sheet2 = pd.read_excel(
+                    r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
+                    r'\Common folder AP & AR\Brokerage Statement Automation\support files\state_lookups.xlsx',
+                    sheet_name='Sheet2',
+                )
+                state_lookups_sheet2['state'] = (
+                    state_lookups_sheet2['state'].astype(str).str.strip().str.lower()
+                )
+                state_lookups_sheet2['shortform'] = (
+                    state_lookups_sheet2['shortform'].astype(str).str.strip()
+                )
+                processed_df['Branch'] = (
+                    processed_df['Branch'].astype(str).str.strip().str.lower()
+                )
+                branch_lookup = state_lookups_sheet2.set_index('state')[
+                    'shortform'
+                ].to_dict()
+                processed_df['Branch'] = processed_df['Branch'].map(branch_lookup).fillna('')
+            else:
+                processed_df['Branch'] = ''
+
+            # Income category lookup
+            if 'Income category' in processed_df.columns:
+                state_lookups_sheet4 = pd.read_excel(
+                    r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
+                    r'\Common folder AP & AR\Brokerage Statement Automation\support files\state_lookups.xlsx',
+                    sheet_name='Sheet4',
+                )
+                state_lookups_sheet4['BUSINESS_TYPE'] = (
+                    state_lookups_sheet4['BUSINESS_TYPE']
+                    .astype(str)
+                    .str.strip()
+                    .str.lower()
+                )
+                state_lookups_sheet4['lookups'] = (
+                    state_lookups_sheet4['lookups'].astype(str).str.strip()
+                )
+                processed_df['Income category'] = (
+                    processed_df['Income category']
+                    .astype(str)
+                    .str.strip()
+                    .str.lower()
+                )
+                income_category_lookup = (
+                    state_lookups_sheet4.set_index('BUSINESS_TYPE')['lookups']
+                    .to_dict()
+                )
+                processed_df['Income category'] = processed_df['Income category'].map(
+                    income_category_lookup
+                ).fillna('')
+            else:
+                processed_df['Income category'] = ''
+
+            # Set 'Entry No.' and other columns
+            processed_df['Entry No.'] = range(1, len(processed_df) + 1)
+            processed_df['Debtor Name'] = 'Edelweiss Tokio Life Insurance Company Limited'
+            processed_df['AccountType'] = "Customer"
+            processed_df['AccountTypeDuplicate'] = processed_df['AccountType']
+            processed_df['Nature of Transaction'] = "Brokerage Statement"
+            processed_df['TDS Ledger'] = processed_df['Debtor Name']
+            processed_df['RepDate'] = datetime.today().strftime('%d-%b-%y')
+            processed_df['NPT2'] = subject.replace('FW:', '').replace('RE:', '').strip()
+            processed_df['Debtor Branch Ref'] = ''
+            processed_df['ASP Practice'] = ''
+            processed_df['NPT'] = ''
+            processed_df['Bank Ledger'] = ''
+            processed_df['Service Tax Ledger'] = ''
+            processed_df['Narration'] = ''
+            processed_df['Policy Type'] = ''
+
+            # Calculate sum of 'Brokerage'
+            sum_brokerage = processed_df['Brokerage'].astype(str).apply(
+                lambda x: float(str(x).replace(',', '').replace('(', '').replace(')', '')) if x != '' else 0.0
+            ).sum()
+
+            # Get 'Net Amount' from 'table_3'
+            net_amount_column = table_3.columns[-1]
+            net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
+            net_amount_values_numeric = pd.to_numeric(net_amount_values_cleaned, errors='coerce').fillna(0)
+            # Modification: Take the first value instead of sum
+            if len(net_amount_values_numeric) > 0:
+                net_amount_value = net_amount_values_numeric.iloc[0]
+            else:
+                net_amount_value = 0.0
+            net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
+            print(f"Net amount from 'table_3' is {net_amount_value}")
+
+            # Check if sum_brokerage is approximately equal to net_amount_value
+            brokerage_equals_net_amount = np.isclose(sum_brokerage, net_amount_value, atol=0.01)
+
+            # Get details from 'table_4'
+            amount_values_cleaned = table_4['Amount'].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
+            amount_values_numeric = pd.to_numeric(amount_values_cleaned, errors='coerce').fillna(0)
+            amount_total = amount_values_numeric.sum()
+            narration_value_original = "{:,.2f}".format(amount_total)
+
+            bank_value = table_4['Bank'].iloc[0] if 'Bank' in table_4.columns else ''
+
+            date_col = table_4['Date'].iloc[0] if 'Date' in table_4.columns else datetime.today().strftime('%d/%m/%Y')
+
+            insurer_name = table_4['Insurer Name'].iloc[0] if 'Insurer Name' in table_4.columns else ''
+            if 'Narration' in table_4.columns and not table_4['Narration'].empty:
+                narration_from_table_4 = table_4['Narration'].iloc[0]
+            elif 'Narration (Ref)' in table_4.columns and not table_4['Narration (Ref)'].empty:
+                narration_from_table_4 = table_4['Narration (Ref)'].iloc[0]
+            else:
+                # Handle narration from table_3 if first column is unnamed
+                if table_3.columns[0] == '' or pd.isna(table_3.columns[0]):
+                    if table_3.shape[1] > 1:
+                        narration_from_table_3 = table_3.iloc[0, 1]
+                    else:
+                        narration_from_table_3 = ''
+                else:
+                    narration_from_table_3 = ''
+                narration_from_table_4 = narration_from_table_3
+
+            # Get 'GST' presence in 'table_3' columns
+            gst_present = any('GST' in col or 'GST @18%' in col for col in table_3.columns)
+
+            # Check for 'TDS' presence in 'table_3' columns
+            tds_present = any('TDS' in col or 'TDS @10%' in col for col in table_3.columns)
+
+            # Remove special characters from 'Narration' for file naming
+            safe_narration = ''.join(e for e in narration_from_table_4 if e.isalnum() or e == ' ').strip()
+
+            # Get 'Debtor Branch Ref' from 'cust_neft_data' using 'Insurer Name'
+            debtor_branch_ref_row = cust_neft_data[cust_neft_data['Name'].str.lower() == insurer_name.lower()]
+            if not debtor_branch_ref_row.empty:
+                debtor_branch_ref = debtor_branch_ref_row['No.2'].iloc[0]
+            else:
+                debtor_branch_ref = ''
+            processed_df['Debtor Branch Ref'] = debtor_branch_ref
+            processed_df['Service Tax Ledger'] = processed_df['Debtor Branch Ref'].str.replace('CUST_NEFT_', '')
+            processed_df['Debtor Name'] = insurer_name
+
+            # Convert date to dd/mm/yyyy format
+            try:
+                date_col_formatted = pd.to_datetime(date_col).strftime('%d/%m/%Y')
+            except:
+                date_col_formatted = datetime.today().strftime('%d/%m/%Y')
+
+            # Get 'supplier_name_col' from 'table_4'
+            supplier_name_col = ''
+            for col in ['Insurer Name', 'Insurer', 'SupplierName']:
+                if col in table_4.columns and not table_4[col].empty:
+                    supplier_name_col = table_4[col].iloc[0]
+                    break
+
+            # Create narration considering GST and TDS
+            narration_parts = [f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col}"]
+            if gst_present:
+                narration_parts.append("with GST 18%")
+            else:
+                narration_parts.append("without GST 18%")
+            if gst_present and not np.isclose(float(narration_value_original.replace(',', '')), net_amount_value, atol=0.01):
+                narration_parts[0] += f" ({net_amount_value_formatted})"
+            narration = ' '.join(narration_parts)
+            processed_df['Narration'] = narration
+
+            # Map 'Bank Ledger' similar to others
+            bank_ledger_lookup = {
+                'CITI_005_2600004': 'CITIBANK 340214005 ACCOUNT',
+                'HSBC_001_2600014': 'HSBC A/C-030-618375-001',
+                'HSBC': 'HSBC A/C-030-618375-001'
+            }
+            bank_ledger_value = bank_value
+            for key, value in bank_ledger_lookup.items():
+                if bank_value == key:
+                    bank_ledger_value = value
+                    break
+            processed_df['Bank Ledger'] = bank_ledger_value
+
+            # Calculate Brokerage values for the new rows
+            tds_column = None
+            for col in table_3.columns:
+                if 'TDS' in col or 'TDS @10%' in col:
+                    tds_column = col
+                    break
+            if tds_column is not None:
+                tds_values_cleaned = table_3[tds_column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
+                tds_values_numeric = pd.to_numeric(tds_values_cleaned, errors='coerce').fillna(0)
+                invoice_nos = ', '.join(table_4['Invoice No'].dropna().astype(str).unique()) if 'Invoice No' in table_4.columns else ''
+                # Modification: Take the first value instead of sum
+                if len(tds_values_numeric) > 0:
+                    third_new_row_brokerage = tds_values_numeric.iloc[0]
+                else:
+                    third_new_row_brokerage = 0.0
+                third_new_row_brokerage = -abs(third_new_row_brokerage)
+            else:
+                third_new_row_brokerage = 0.0
+
+            # Initialize list to collect new rows
+            new_rows_list = []
+
+            if gst_present:
+                gst_amount = sum_brokerage * 0.18  # Assuming GST is 18%
+                first_new_row_brokerage = gst_amount
+                new_row_gst = {
+                    'Entry No.': '',
+                    'Debtor Name': processed_df['Debtor Name'].iloc[0],
+                    'Nature of Transaction': "GST Receipts",
+                    'AccountType': processed_df['AccountType'].iloc[0],
+                    'Debtor Branch Ref': processed_df['Debtor Branch Ref'].iloc[0],
+                    'Client Name': "GST @ 18%",
+                    'Policy No.': '',
+                    'Risk': '',
+                    'Endorsement No.': "",
+                    'Policy Type': '',
+                    'Policy Start Date': '',
+                    'Policy End Date': '',
+                    'Premium': '0.00',
+                    'Brokerage Rate': '',
+                    'Brokerage': f"{first_new_row_brokerage:.2f}",
+                    'Narration': narration,
+                    'NPT': '',
+                    'Bank Ledger': bank_ledger_value,
+                    'AccountTypeDuplicate': processed_df['AccountTypeDuplicate'].iloc[0],
+                    'Service Tax Ledger': processed_df['Service Tax Ledger'].iloc[0],
+                    'TDS Ledger': processed_df['TDS Ledger'].iloc[0],
+                    'RepDate': processed_df['RepDate'].iloc[-1],
+                    'Branch': '',
+                    'Income category': '',
+                    'ASP Practice': '',
+                    'P & L JV': invoice_nos,
+                    'NPT2': processed_df['NPT2'].iloc[-1]
+                }
+                new_rows_list.append(new_row_gst)
+
+            if tds_present:
+                new_row_tds = {
+                    'Entry No.': '',
+                    'Debtor Name': processed_df['Debtor Name'].iloc[0],
+                    'Nature of Transaction': "TDS Receivable - AY 2025-26",
+                    'AccountType': "G/L Account" if not gst_present else processed_df['AccountType'].iloc[0],
+                    'Debtor Branch Ref': processed_df['Debtor Branch Ref'].iloc[0],
+                    'Client Name': "TDS Receivable - AY 2025-26",
+                    'Policy No.': '',
+                    'Risk': '',
+                    'Endorsement No.': "",
+                    'Policy Type': '',
+                    'Policy Start Date': '',
+                    'Policy End Date': '',
+                    'Premium': '0.00',
+                    'Brokerage Rate': '',
+                    'Brokerage': f"{third_new_row_brokerage:.2f}",
+                    'Narration': narration,
+                    'NPT': '',
+                    'Bank Ledger': bank_ledger_value,
+                    'AccountTypeDuplicate': 'G/L Account',
+                    'Service Tax Ledger': '2300022',
+                    'TDS Ledger': 'TDS Receivable - AY 2025-26',
+                    'RepDate': processed_df['RepDate'].iloc[-1],
+                    'Branch': '',
+                    'Income category': '',
+                    'ASP Practice': '',
+                    'P & L JV': invoice_nos,
+                    'NPT2': processed_df['NPT2'].iloc[-1]
+                }
+                new_rows_list.append(new_row_tds)
+
+            # Create DataFrame from new_rows_list
+            if new_rows_list:
+                new_rows = pd.DataFrame(new_rows_list)
+                # Concatenate new_rows to processed_df
+                processed_df = pd.concat([processed_df, new_rows], ignore_index=True)
+
+            # Update 'Entry No.'
+            processed_df['Entry No.'] = range(1, len(processed_df) + 1)
+
+            # Rearranging columns to desired order
+            desired_columns = [
+                'Entry No.', 'Debtor Name', 'Nature of Transaction', 'AccountType',
+                'Debtor Branch Ref', 'Client Name', 'Policy No.', 'Risk',
+                'Endorsement No.', 'Policy Type', 'Policy Start Date',
+                'Policy End Date', 'Premium', 'Brokerage Rate', 'Brokerage',
+                'Narration', 'NPT', 'Bank Ledger', 'AccountTypeDuplicate',
+                'Service Tax Ledger', 'TDS Ledger', 'RepDate', 'Branch',
+                'Income category', 'ASP Practice', 'P & L JV', 'NPT2',
+            ]
+            for col in desired_columns:
+                if col not in processed_df.columns:
+                    processed_df[col] = ''
+            processed_df = processed_df[desired_columns]
+
+            # Remove empty rows and update 'Entry No.'
+            processed_df = processed_df.dropna(
+                how='all',
+                subset=processed_df.columns.difference(['Entry No.'])
+            ).reset_index(drop=True)
+            processed_df['Entry No.'] = range(1, len(processed_df) + 1)
+
+            # Only append non-empty processed_df
+            if not processed_df.empty:
+                processed_sections.append(processed_df)
+            else:
+                print(f"Processed section {idx + 1} is empty after processing.")
+
+        if processed_sections:
+            # Concatenate all processed sections
+            final_processed_df = pd.concat(processed_sections, ignore_index=True)
+        else:
+            raise ValueError("No valid processed sections to concatenate.")
+
+        # Generate the shortened subject and date for the filename
+        safe_narration = safe_narration.replace(' ', '_')[:50]
+        date_str = datetime.now().strftime("%Y%m%d")
+
+        # Define output directories
+        base_dir = (
+            r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
+            r'\Common folder AP & AR\Brokerage Statement Automation\Edelweiss Tokio Life Insurance Template Files'
+        )
+        excel_dir = os.path.join(base_dir, 'excel_file')
+        csv_dir = os.path.join(base_dir, 'csv_file')
+
+        # Ensure directories exist
+        os.makedirs(excel_dir, exist_ok=True)
+        os.makedirs(csv_dir, exist_ok=True)
+
+        # Save the processed dataframe
+        excel_file_name = f'{safe_narration}_{date_str}.xlsx'
+        csv_file_name = f'{safe_narration}_{date_str}.csv'
+        excel_file_path = os.path.join(excel_dir, excel_file_name)
+        csv_file_path = os.path.join(csv_dir, csv_file_name)
+        final_processed_df.to_excel(excel_file_path, index=False)
+        final_processed_df.to_csv(csv_file_path, index=False)
+        print(f"Saved Excel file: {excel_file_path}")
+        print(f"Saved CSV file: {csv_file_path}")
+
+        # Return the processed dataframe and the path to the Excel file
+        return final_processed_df, excel_file_path
+
+    except Exception as e:
+        print(f"Error processing Edelweiss Tokio Life Insurance Company Limited: {str(e)}")
         raise
