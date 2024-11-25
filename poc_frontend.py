@@ -1139,10 +1139,10 @@ def select_insurer():
                 'Product': 'Risk',
                 'Policy_Number': 'Policy No.',
                 'Customer': 'Client Name',
-                'Master Policy Holder Name': 'Client Name',
+                'Master Policy Holder Name': 'Client Name1',
                 'Policy End Date': 'Policy End Date',
                 'Policy Start Date': 'Policy Start Date',
-                'mAX_bUPA_sTATE': 'Branch',
+                'Max_Bupa_State': 'Branch',
                 'Business_Type': 'Income Category',
                 'Endorsement Ind': 'Endorsement No.',
                 '': 'ASP Practice',
@@ -1150,7 +1150,23 @@ def select_insurer():
                 'GWP_AMOUNT': 'Premium',
                 'Total_Comm_Amount': 'Brokerage'
                                                       }   
+        elif selected_insurer == 'Edelweiss Tokio Life Insurance Company Limited':
 
+            read_tables_from_email(email_body, selected_insurer)  # Pass the selected insurer to the function
+            default_mappings = {
+                'Product Name': 'Risk',
+                'POLICY_ID': 'Policy No.',
+                'Name': 'Client Name',
+                'Policy End Date': 'Policy End Date',
+                'Policy Start Date': 'Policy Start Date',
+                'Branch': 'Branch',
+                'Type': 'Income Category',
+                'Endorsement Ind': 'Endorsement No.',
+                '': 'ASP Practice',
+                '': 'P & L JV',
+                'MODAL_PREM_AMT': 'Premium',
+                'Total Gross': 'Brokerage'
+                                                      }   
         else:
             # Ensure there's a fallback for other insurers
             default_mappings = {
@@ -1212,7 +1228,8 @@ def edit_mappings():
         'Pramerica Life Insurance Limited':0,
         'Pnb Metlife India Insurance Company Ltd (Pre. Met Life India Insurance Company P':0,
         'Go Digit Life Insurance Limited':0,
-        'Niva Bupa Health Insurance Company Limited (Previously Known As Max Bupa Health':0
+        'Niva Bupa Health Insurance Company Limited (Previously Known As Max Bupa Health':0,
+        'Edelweiss Tokio Life Insurance Company Limited':0
         
         # Add more insurers as needed
     }
@@ -1398,7 +1415,7 @@ def read_tables_from_email(email_body, selected_insurer):
         'The New India Assurance Co', 'The Oriental Insurance Co', 'United India Insurance',
         'ICICI Lombard General Insurance Co. Ltd.', 'Star Health Insurance', 'Hdfc Life Insurance Co. Ltd.',
         'Shriram General Insurance Company Limited', 'Kotak Mahindra General Insurance Company',
-        'Universal Sampo Insurance', 'Zuno General Insurance Limited', 'ICICI Prudential Life Insurance Co Ltd','Niva Bupa Health Insurance Company Limited (Previously Known As Max Bupa Health',
+        'Edelweiss Tokio Life Insurance Company Limited','Universal Sampo Insurance', 'Zuno General Insurance Limited', 'ICICI Prudential Life Insurance Co Ltd','Niva Bupa Health Insurance Company Limited (Previously Known As Max Bupa Health',
         'Go Digit Life Insurance Limited','Pnb Metlife India Insurance Company Ltd (Pre. Met Life India Insurance Company P','Pramerica Life Insurance Limited','Max Life Insurance Co. Ltd. ( Prev. Known As Max New York Life Insurance Co. Ltd','Aditya Birla Sun Life Insurance Company Limited','SBI Life Insurance Company Limited','IFFCO TOKIO General Insurance Co. Ltd.','Star Union Dai-Ichi Life Insurance Company Ltd','Future Generali India Life Insurance Co Ltd','Aditya Birla Health Insurance Co.Ltd.','Manipal Cigna Health Insurance Company Limited (Prev. Cigna Ttk Health Insurance','Future Generali India Insurance Company Limited','Magma Hdi General Insurance Company Limited','Care Health Insurance Limited','Bajaj Allianz Life Insurance Company Limited','Reliance General Insurance Co. Ltd.','Hdfc Ergo General Insurance Company Limited','Bajaj Allianz General Insurance Co. Ltd.','Tata AIG General Insurance Co. Ltd.','Royal Sundaram General Insurance Co Ltd','Raheja Qbe General Insurance Company Limited','GoDigit General Insurance Limited','Acko General Insurance Limited','SBI General Insurance Company Limited','Cholamandalam General Insurance Co. Ltd.', 'Tata AIA Insurance','Liberty Videocon General Insurance Co. Ltd'
     ]
 
