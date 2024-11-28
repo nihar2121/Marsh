@@ -8,7 +8,7 @@ import extract_msg  # To read .msg files
 from bs4 import BeautifulSoup
 import openpyxl
 # Importing the backend functions
-from poc_backend import  kotak_life_insurance_co,process_indialife_first_insurance, proces_aegon_life_insurance_co,process_shriram_life_insurance_co, process_edelweiss_tokio_life_insurance,process_niva_bupa_health_insurance,process_go_digit_life_insurance,process_pnb_metlife_insurance,process_pramerica_life_insurance,process_max_life_insurance,process_aditya_birla_sun_life ,process_sbi_life_insurance_co,process_iffco_tokyo_insurer,process_star_india_diachi,process_future_generalli_life_insurance,process_aditya_insurance_co,process_manipal_health_insurance_company,process_generali_india_insurance_company,process_magma_hdi_general_insurance_company,process_care_health_insurance_limited,process_bajaj_allianz_life_insurance,process_relaince_general_insurance_co, process_hdfc_ergo_insurance, process_bajaj_allianz_insurance,process_tata_aig_insurance,process_royal_sundaram_general_insurance,process_raheja_general_insurance,process_godigit_general_insurance,proess_acko_general_insurance,process_sbi_general_insurance,process_liberty_general_insurance,process_cholamandalam_general_insurance,process_icici_prudential_life_insurance,process_zuna_general_insurance, process_universal_sampo_insurance,process_kotak_mahindra_insurance,process_shriram_general_insurance,process_hdfc_life_insurance_co,process_star_health_insurer,read_lookup_files,process_icici_lombard_insurance, process_new_india_assurance,process_oriental_insurance_co, process_united_india_insurance,process_tata_aia_insurance
+from poc_backend import  process_national_insurance_limited,kotak_life_insurance_co,process_indialife_first_insurance, proces_aegon_life_insurance_co,process_shriram_life_insurance_co, process_edelweiss_tokio_life_insurance,process_niva_bupa_health_insurance,process_go_digit_life_insurance,process_pnb_metlife_insurance,process_pramerica_life_insurance,process_max_life_insurance,process_aditya_birla_sun_life ,process_sbi_life_insurance_co,process_iffco_tokyo_insurer,process_star_india_diachi,process_future_generalli_life_insurance,process_aditya_insurance_co,process_manipal_health_insurance_company,process_generali_india_insurance_company,process_magma_hdi_general_insurance_company,process_care_health_insurance_limited,process_bajaj_allianz_life_insurance,process_relaince_general_insurance_co, process_hdfc_ergo_insurance, process_bajaj_allianz_insurance,process_tata_aig_insurance,process_royal_sundaram_general_insurance,process_raheja_general_insurance,process_godigit_general_insurance,proess_acko_general_insurance,process_sbi_general_insurance,process_liberty_general_insurance,process_cholamandalam_general_insurance,process_icici_prudential_life_insurance,process_zuna_general_insurance, process_universal_sampo_insurance,process_kotak_mahindra_insurance,process_shriram_general_insurance,process_hdfc_life_insurance_co,process_star_health_insurer,read_lookup_files,process_icici_lombard_insurance, process_new_india_assurance,process_oriental_insurance_co, process_united_india_insurance,process_tata_aia_insurance
 from datetime import datetime
 from urllib.parse import unquote_plus
 
@@ -605,7 +605,7 @@ def select_insurer():
             default_mappings = {
 
                 'S Proddesc': 'Risk',
-                'D_POLL': 'Policy No.',
+                'dfs': 'Policy No.',
                 'S Insuredname': 'Client Name',
                 'S Doe': 'Policy End Date',
                 'S Doi': 'Policy Start Date',
@@ -613,7 +613,7 @@ def select_insurer():
                 'TOTAL COMM': 'Brokerage',
                 'S Divisionname': 'Branch',
                 'S Fresh Renewal': 'Income category',
-                'S Endorsementno':'Endorsement No.'
+                'fsdf':'Endorsement No.'
 
             }
         elif selected_insurer == 'Kotak Mahindra General Insurance Company':
@@ -1235,7 +1235,23 @@ def select_insurer():
                 'ddsd': 'Premium',
                 'dfsfs': 'Brokerage'
                                                       }  
+        elif selected_insurer == 'National Insurance Company Limited':
 
+            read_tables_from_email(email_body, selected_insurer)  # Pass the selected insurer to the function
+            default_mappings = {
+                'Risk Code': 'Risk',
+                'POLICY_NUMBER': 'Policy No.',
+                'INSURED_NAME': 'Client Name',
+                'POLICY_EXP_DATE': 'Policy End Date',
+                'DOC': 'Policy Start Date',
+                'OFFICE_CODE': 'Branch',
+                'Type': 'Income Category',
+                'ENDORSEMENT_NUMBER': 'Endorsement No.',
+                'Master Pol. No.': 'ASP Practice',
+                '': 'P & L JV',
+                'PREMIUM_AMOUNT': 'Premium',
+                'COMMISSION_AMOUNT': 'Brokerage'
+                                                      } 
         else:
             # Ensure there's a fallback for other insurers
             default_mappings = {
@@ -1268,6 +1284,7 @@ def edit_mappings():
         'Hdfc Life Insurance Co. Ltd.':0,
         'Shriram General Insurance Company Limited':0,
         'Kotak Mahindra General Insurance Company':0,
+        'National Insurance Company Limited':0,
         'Kotak Mahindra Life Insurance Company Limited(Previously Know As Kotak Mahindra':0,
         'Universal Sampo Insurance':0,
         'Zuno General Insurance Limited':0,
@@ -1484,7 +1501,7 @@ def read_tables_from_email(email_body, selected_insurer):
 
     supported_insurers = [
         'The New India Assurance Co', 'The Oriental Insurance Co', 'United India Insurance',
-        'ICICI Lombard General Insurance Co. Ltd.', 'Star Health Insurance', 'Hdfc Life Insurance Co. Ltd.',
+        'National Insurance Company Limited','ICICI Lombard General Insurance Co. Ltd.', 'Star Health Insurance', 'Hdfc Life Insurance Co. Ltd.',
         'Kotak Mahindra Life Insurance Company Limited(Previously Know As Kotak Mahindra','IndiaFirst Life Insurance Company Ltd','Shriram General Insurance Company Limited', 'Kotak Mahindra General Insurance Company',
         'Shriram Life Insurance Company Limited','Edelweiss Tokio Life Insurance Company Limited','Universal Sampo Insurance', 'Zuno General Insurance Limited', 'ICICI Prudential Life Insurance Co Ltd','Niva Bupa Health Insurance Company Limited (Previously Known As Max Bupa Health',
         'Aegon Life Insurance Company Private Limited','Go Digit Life Insurance Limited','Pnb Metlife India Insurance Company Ltd (Pre. Met Life India Insurance Company P','Pramerica Life Insurance Limited','Max Life Insurance Co. Ltd. ( Prev. Known As Max New York Life Insurance Co. Ltd','Aditya Birla Sun Life Insurance Company Limited','SBI Life Insurance Company Limited','IFFCO TOKIO General Insurance Co. Ltd.','Star Union Dai-Ichi Life Insurance Company Ltd','Future Generali India Life Insurance Co Ltd','Aditya Birla Health Insurance Co.Ltd.','Manipal Cigna Health Insurance Company Limited (Prev. Cigna Ttk Health Insurance','Future Generali India Insurance Company Limited','Magma Hdi General Insurance Company Limited','Care Health Insurance Limited','Bajaj Allianz Life Insurance Company Limited','Reliance General Insurance Co. Ltd.','Hdfc Ergo General Insurance Company Limited','Bajaj Allianz General Insurance Co. Ltd.','Tata AIG General Insurance Co. Ltd.','Royal Sundaram General Insurance Co Ltd','Raheja Qbe General Insurance Company Limited','GoDigit General Insurance Limited','Acko General Insurance Limited','SBI General Insurance Company Limited','Cholamandalam General Insurance Co. Ltd.', 'Tata AIA Insurance','Liberty Videocon General Insurance Co. Ltd'

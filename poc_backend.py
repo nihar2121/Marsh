@@ -2768,7 +2768,7 @@ def process_shriram_general_insurance(file_path, template_data, risk_code_data, 
                 processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
                 processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
-        if processed_df['Endorsement No.'] is not blank:
+        if not processed_df['Endorsement No.'].isnull().all():
             if 'Policy No.' in processed_df.columns:
                 # Extract numbers after last '/'
                 def extract_endorsement_no(policy_no):
@@ -2829,6 +2829,21 @@ def process_shriram_general_insurance(file_path, template_data, risk_code_data, 
             processed_df['Income category'] = processed_df['Income category'].map(income_category_lookup).fillna('')
         else:
             processed_df['Income category'] = ''
+
+            if 'Endorsement No.' in processed_df.columns and 'P & L JV' in processed_df.columns:
+                def process_endorsement(row):
+                    endorsement_no = str(row['Endorsement No.']).strip()
+                    if endorsement_no in ['0', '00', '000']:
+                        row['Endorsement No.'] = ''
+                        row['P & L JV'] = ''
+                    elif endorsement_no.upper() == 'G01 1':
+                        row['P & L JV'] = ''
+                    elif endorsement_no != '':
+                        row['P & L JV'] = 'Endorsement'
+                    else:
+                        row['P & L JV'] = ''
+                    return row
+                processed_df = processed_df.apply(process_endorsement, axis=1)
 
         # Create necessary columns similar to 'ICICI Lombard'
         processed_df['Entry No.'] = range(1, len(processed_df) + 1)
@@ -2971,7 +2986,7 @@ def process_shriram_general_insurance(file_path, template_data, risk_code_data, 
             tds_values_cleaned = table_3[tds_column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
             tds_values_numeric = pd.to_numeric(tds_values_cleaned, errors='coerce').fillna(0)
             third_new_row_brokerage = tds_values_numeric.sum()
-            third_new_row_client_name = tds_column
+            third_new_row_client_name =  -abs(tds_column)
         else:
             # Get second column available
             data_columns = table_3.columns.tolist()[1:]  # Exclude first column
@@ -2980,7 +2995,7 @@ def process_shriram_general_insurance(file_path, template_data, risk_code_data, 
                 second_column_values_cleaned = table_3[second_column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
                 second_column_values_numeric = pd.to_numeric(second_column_values_cleaned, errors='coerce').fillna(0)
                 third_new_row_brokerage = second_column_values_numeric.sum()
-                third_new_row_brokerage = - third_new_row_brokerage
+                third_new_row_brokerage =  -abs(third_new_row_brokerage)
                 third_new_row_client_name = second_column
             else:
                 third_new_row_brokerage = 0.0
