@@ -3,6 +3,8 @@ import numpy as np
 from datetime import datetime,timedelta
 import os
 import re
+import sys
+
 def read_lookup_files():
     try:
         template_path = r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller\Common folder AP & AR\Brokerage Statement Automation\support files\Unused Template Final.xlsx'
