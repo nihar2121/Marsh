@@ -21738,23 +21738,6 @@ def kotak_life_insurance_co(file_path, template_data, risk_code_data, cust_neft_
         print(f"Error processing Kotak Mahindra Life Insurance Company Limited(Previously Know As Kotak Mahindra: {str(e)}")
         raise
 
-import os
-import pandas as pd
-import numpy as np
-from datetime import datetime
-import sys
-
-def parse_date_flexible(date_str):
-    """
-    A helper function to parse dates in various formats.
-    Modify this function based on the expected date formats.
-    """
-    for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d", "%d/%m/%y", "%d-%b-%y"):
-        try:
-            return pd.to_datetime(date_str, format=fmt)
-        except (ValueError, TypeError):
-            continue
-    return pd.NaT
 
 def process_national_insurance_limited(file_path, template_data, risk_code_data, cust_neft_data, table_3, table_4, table_5, subject, mappings):
     try:
@@ -21909,22 +21892,20 @@ def process_national_insurance_limited(file_path, template_data, risk_code_data,
                 # Function to extract numeric part from 'Branch' and map to SupplierState
                 def map_branch(branch_value):
                     if pd.isnull(branch_value):
-                        return '', ''
+                        return pd.Series({'Branch_numeric': np.nan, 'SupplierState': ''})
                     # Extract numeric part from Branch
                     branch_numeric = ''.join(filter(str.isdigit, str(branch_value)))
                     if branch_numeric == '':
-                        return '', ''
+                        return pd.Series({'Branch_numeric': np.nan, 'SupplierState': ''})
                     branch_numeric = int(branch_numeric)
                     # Match with SupplierCode_numeric
                     match = table_5[table_5['SupplierCode_numeric'] == branch_numeric]
                     if not match.empty:
                         supplier_state = match['SupplierState'].iloc[0]
-                        return branch_numeric, supplier_state
-                    return '', ''
+                        return pd.Series({'Branch_numeric': branch_numeric, 'SupplierState': supplier_state})
+                    return pd.Series({'Branch_numeric': np.nan, 'SupplierState': ''})
 
-                processed_df[['Branch_numeric', 'SupplierState']] = processed_df['Branch'].apply(
-                    lambda x: pd.Series(map_branch(x))
-                )
+                processed_df[['Branch_numeric', 'SupplierState']] = processed_df['Branch'].apply(map_branch)
 
                 # Now map Branch using SupplierState
                 if not processed_df['SupplierState'].isnull().all():
@@ -21938,7 +21919,7 @@ def process_national_insurance_limited(file_path, template_data, risk_code_data,
                         state_lookups_sheet2['state'].astype(str).str.strip().str.lower()
                     )
                     state_lookups_sheet2['shortform'] = (
-                        state_lookups_sheet2['shortform'].astype(str).str.strip()
+                        state_lookups_sheet2['shortform'].astype(str).str.strip().str.lower()
                     )
                     # Ensure SupplierState is string and clean it
                     processed_df['SupplierState'] = processed_df['SupplierState'].astype(str).str.strip().str.lower()
@@ -22037,6 +22018,17 @@ def process_national_insurance_limited(file_path, template_data, risk_code_data,
             # Clean and convert the columns to float
             table_3['TotalTaxAmt_cleaned'] = table_3[total_tax_amt_col].astype(str).str.replace(',', '').astype(float)
             table_3['GST TDS_cleaned'] = table_3[gst_tds_col].astype(str).str.replace(',', '').astype(float)
+
+            # Ensure 'SupplierState' exists in table_3 by merging with table_5 if not already present
+            if 'SupplierState' not in table_3.columns:
+                # Assuming there's a common key to merge on, e.g., 'SupplierCode_numeric'
+                table_3 = table_3.merge(
+                    table_5[['SupplierCode_numeric', 'SupplierState']],
+                    on='SupplierCode_numeric',  # Replace with actual key column
+                    how='left'
+                )
+                if 'SupplierState' not in table_3.columns:
+                    raise KeyError("'SupplierState' not found in table_3 after merging.")
 
             # Calculate the difference between 'TotalTaxAmt' and sum of brokerage
             table_3['Brokerage_Diff'] = abs(table_3['TotalTaxAmt_cleaned'] - sum_brokerage)
