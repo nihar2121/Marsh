@@ -21738,6 +21738,12 @@ def kotak_life_insurance_co(file_path, template_data, risk_code_data, cust_neft_
         print(f"Error processing Kotak Mahindra Life Insurance Company Limited(Previously Know As Kotak Mahindra: {str(e)}")
         raise
 
+import os
+import sys
+import pandas as pd
+import numpy as np
+from datetime import datetime
+
 def process_national_insurance_limited(
     file_path,
     template_data,
@@ -21934,18 +21940,18 @@ def process_national_insurance_limited(
 
             # Handle 'Branch' mapping
             if 'Branch' in processed_df.columns:
-                print("Processing 'Branch' column with lookup")
+                print("Processing 'Branch' column with lookup.")
                 # Clean 'SupplierCode' in table_5 to remove letters/strings and keep only numbers
                 table_5['SupplierCode_numeric'] = table_5['SupplierCode'].astype(str).str.extract('(\d+)', expand=False)
                 table_5['SupplierCode_numeric'] = table_5['SupplierCode_numeric'].astype(str).str.strip()
                 # Clean 'Branch' in processed_df to ensure it's comparable
-                processed_df['Branch'] = processed_df['Branch'].astype(str).str.strip().str.lower()
+                processed_df['Branch'] = processed_df['Branch'].astype(str).str.strip()
                 # Map 'Branch' to 'SupplierState' using 'SupplierCode_numeric'
                 supplier_code_state_map = table_5.set_index('SupplierCode_numeric')['SupplierState'].to_dict()
                 processed_df['SupplierState'] = processed_df['Branch'].map(supplier_code_state_map).fillna('')
                 print(f"Branch mapping completed. Unique SupplierStates after mapping: {processed_df['SupplierState'].unique()}")
 
-                # Further map 'SupplierState' to shortform using Sheet2 of state_lookups.xlsx
+                # Additional Branch Mapping as per user instructions
                 state_lookups_sheet2 = pd.read_excel(
                     r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
                     r'\Common folder AP & AR\Brokerage Statement Automation\support files'
@@ -21958,13 +21964,28 @@ def process_national_insurance_limited(
                 state_lookups_sheet2['shortform'] = (
                     state_lookups_sheet2['shortform'].astype(str).str.strip()
                 )
+                processed_df['Branch'] = (
+                    processed_df['SupplierState'].astype(str).str.strip().str.lower()
+                )
                 branch_lookup = state_lookups_sheet2.set_index('state')['shortform'].to_dict()
-                processed_df['Branch'] = processed_df['SupplierState'].map(branch_lookup).fillna(processed_df['SupplierState'])
+                processed_df['Branch'] = processed_df['Branch'].map(branch_lookup).fillna(processed_df['Branch'])
                 print(f"Branch shortform mapping completed. Unique branches: {processed_df['Branch'].unique()}")
             else:
                 print("'Branch' column not in processed data, setting 'Branch' to empty.")
                 processed_df['Branch'] = ''
                 processed_df['SupplierState'] = ''
+
+            # Map 'SupplierState' to 'Branch' using 'state_lookups.xlsx'
+            state_lookups_path = r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller\Common folder AP & AR\Brokerage Statement Automation\support files\state_lookups.xlsx'
+            state_lookups = pd.read_excel(state_lookups_path)
+            state_lookups['state'] = state_lookups['state'].astype(str).str.strip().str.lower()
+            state_lookups['shortform'] = state_lookups['shortform'].astype(str).str.strip().str.upper()
+
+            # Map 'SupplierState' to its short form
+            processed_df['SupplierState'] = processed_df['SupplierState'].str.strip().str.lower()
+            branch_map = state_lookups.set_index('state')['shortform'].to_dict()
+            processed_df['Branch'] = processed_df['SupplierState'].map(branch_map).fillna(processed_df['Branch'])
+            print(f"Branch shortform mapping completed. Unique branches: {processed_df['Branch'].unique()}")
 
             # Implement Endorsement logic
             if 'Endorsement No.' in processed_df.columns and 'P & L JV' in processed_df.columns:
@@ -21986,7 +22007,10 @@ def process_national_insurance_limited(
             # === Begin of Additional Processing ===
 
             # Calculate sum of 'Brokerage'
-            sum_brokerage = processed_df['Brokerage'].astype(float).sum()
+            sum_brokerage = processed_df['Brokerage'].astype(str).apply(
+                lambda x: float(str(x).replace(',', '').replace('(', '').replace(')', '')) if x != '' else 0.0
+            ).sum()
+
             print(f"Sum of brokerage: {sum_brokerage}")
 
             # Get 'Net Amount' from 'table_3'
@@ -22064,12 +22088,166 @@ def process_national_insurance_limited(
                     narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} without GST 18%"
             processed_df['Narration'] = narration
 
-            # Handle 'Brokerage' and 'GST TDS'
-            # Calculate 'gst_tds_18_percent' and 'third_new_row_brokerage'
-            gst_tds_18_percent = sum_brokerage * 0.18
-            total_brokerage_with_new_rows = sum_brokerage + gst_tds_18_percent
+            # === Begin of Additional Processing ===
 
-            # Get 'GST TDS' from table_5
+            # Calculate sum of 'Brokerage'
+            sum_brokerage = processed_df['Brokerage'].astype(str).apply(
+                lambda x: float(str(x).replace(',', '').replace('(', '').replace(')', '')) if x != '' else 0.0
+            ).sum()
+
+            print(f"Sum of brokerage: {sum_brokerage}")
+
+            # Get 'Net Amount' from 'table_3'
+            net_amount_column = table_3.columns[-1]
+            net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
+            net_amount_values_numeric = pd.to_numeric(net_amount_values_cleaned, errors='coerce').fillna(0)
+            # Modification: Take the first value instead of sum
+            if len(net_amount_values_numeric) > 0:
+                net_amount_value = net_amount_values_numeric.iloc[0]
+            else:
+                net_amount_value = 0.0
+            net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
+            print(f"Net amount from 'table_3' is {net_amount_value}")
+
+            # Check if sum_brokerage is approximately equal to net_amount_value
+            brokerage_equals_net_amount = np.isclose(sum_brokerage, net_amount_value, atol=0.01)
+
+            # Get details from 'table_4'
+            amount_values_cleaned = table_4['Amount'].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
+            amount_values_numeric = pd.to_numeric(amount_values_cleaned, errors='coerce').fillna(0)
+            amount_total = amount_values_numeric.sum()
+            narration_value_original = "{:,.2f}".format(amount_total)
+
+            bank_value = table_4['Bank'].iloc[0] if 'Bank' in table_4.columns else ''
+
+            date_col = table_4['Date'].iloc[0] if 'Date' in table_4.columns else datetime.today().strftime('%d/%m/%Y')
+
+            insurer_name = table_4['Insurer Name'].iloc[0] if 'Insurer Name' in table_4.columns else ''
+            if 'Narration' in table_4.columns and not table_4['Narration'].empty:
+                narration_from_table_4 = table_4['Narration'].iloc[0]
+            elif 'Narration (Ref)' in table_4.columns and not table_4['Narration (Ref)'].empty:
+                narration_from_table_4 = table_4['Narration (Ref)'].iloc[0]
+            else:
+                narration_from_table_4 = ''
+
+            # Get 'GST' presence in 'table_3' columns
+            gst_present = any('GST' in col or 'GST @18%' in col for col in table_3.columns)
+
+            # Remove special characters from 'Narration' for file naming
+            safe_narration = ''.join(e for e in narration_from_table_4 if e.isalnum() or e == ' ').strip()
+
+            # Get 'Debtor Branch Ref' from 'cust_neft_data' using 'Insurer Name'
+            debtor_branch_ref_row = cust_neft_data[cust_neft_data['Name'].str.lower() == insurer_name.lower()]
+            if not debtor_branch_ref_row.empty:
+                debtor_branch_ref = debtor_branch_ref_row['No.2'].iloc[0]
+            else:
+                debtor_branch_ref = ''
+            processed_df['Debtor Branch Ref'] = debtor_branch_ref
+            processed_df['Service Tax Ledger'] = processed_df['Debtor Branch Ref'].str.replace('CUST_NEFT_', '')
+            processed_df['Debtor Name'] = insurer_name
+
+            # Convert date to dd/mm/yyyy format
+            try:
+                date_col_formatted = pd.to_datetime(date_col).strftime('%d/%m/%Y')
+            except:
+                date_col_formatted = ''
+
+            # Get 'supplier_name_col' from 'table_4'
+            supplier_name_col = ''
+            for col in ['Insurer Name', 'Insurer', 'SupplierName']:
+                if col in table_4.columns and not table_4[col].empty:
+                    supplier_name_col = table_4[col].iloc[0]
+                    break
+
+            # Create narration considering GST and value in brackets
+            if gst_present:
+                if not np.isclose(float(narration_value_original.replace(',', '')), net_amount_value, atol=0.01):
+                    narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} ({net_amount_value_formatted}) from {supplier_name_col} with GST 18%"
+                else:
+                    narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} with GST 18%"
+            else:
+                if not np.isclose(float(narration_value_original.replace(',', '')), net_amount_value, atol=0.01):
+                    narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} ({net_amount_value_formatted}) from {supplier_name_col} without GST 18%"
+                else:
+                    narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} without GST 18%"
+            processed_df['Narration'] = narration
+
+            # Calculate sum of 'Brokerage'
+            sum_brokerage = processed_df['Brokerage'].astype(str).apply(
+                lambda x: float(str(x).replace(',', '').replace('(', '').replace(')', '')) if x != '' else 0.0
+            ).sum()
+
+            # Get 'Amount', 'Bank', 'Date', 'Insurer Name', 'Narration' from table_4.csv
+            table_4['Amount_cleaned'] = table_4['Amount'].astype(str).str.replace(',', '').astype(float)
+            table_4['Brokerage_Diff'] = abs(table_4['Amount_cleaned'] - sum_brokerage)
+            amount_matching_row_index = table_4['Brokerage_Diff'].idxmin()
+            amount_matching_row = table_4.loc[amount_matching_row_index]
+            narration_value_original = amount_matching_row['Amount']  # Use original amount with commas
+            bank_value = amount_matching_row['Bank']
+            date_col = amount_matching_row['Date']
+            insurer_name = amount_matching_row['Insurer Name']
+            invoice_no = amount_matching_row['Invoice No']
+            narration_from_table_4 = amount_matching_row['Narration']
+            print(f"Matching amount found in table_4 at index {amount_matching_row_index}")
+
+            # Set 'NPT2' using 'Narration' from table_4
+            processed_df['NPT2'] = narration_from_table_4
+
+            # Remove special characters from 'Narration' for file naming
+            safe_narration = ''.join(e for e in str(narration_from_table_4) if e.isalnum() or e == ' ').strip()
+
+            # Get 'Debtor Branch Ref' from 'cust_neft_data' using 'Insurer Name' from table_4
+            debtor_branch_ref_row = cust_neft_data[cust_neft_data['Name'] == insurer_name]
+            if not debtor_branch_ref_row.empty:
+                debtor_branch_ref = debtor_branch_ref_row['No.2'].iloc[0]
+            else:
+                debtor_branch_ref = ''
+            print(f"Debtor Branch Ref: {debtor_branch_ref}")
+
+            # Set 'Debtor Branch Ref' in processed_df
+            processed_df['Debtor Branch Ref'] = debtor_branch_ref
+
+            # 'Service Tax Ledger' is derived from 'Debtor Branch Ref'
+            processed_df['Service Tax Ledger'] = processed_df['Debtor Branch Ref'].str.replace('CUST_NEFT_', '', regex=False)
+
+            # Set 'Debtor Name' as 'Insurer Name'
+            processed_df['Debtor Name'] = insurer_name
+
+            # Set 'Bank Ledger' for all rows
+            bank_ledger_lookup = {
+                'CITI_005_2600004': 'CITIBANK 340214005 ACCOUNT',
+                'HSBC_001_2600014': 'HSBC A/C-030-618375-001',
+                'HSBC': 'HSBC A/C-030-618375-001'
+            }
+            bank_ledger_value = bank_ledger_lookup.get(bank_value, bank_value)
+            processed_df['Bank Ledger'] = bank_ledger_value
+
+            # Set 'Narration' for the entire table, and leave it blank in additional rows
+            narration = f"NEFT Recd From {insurer_name} on {pd.to_datetime(date_col).strftime('%m/%d/%Y')} for Rs.{narration_value_original}"
+            processed_df['Narration'] = narration
+
+            # Remove 'TDS Ledger' in additional rows
+            processed_df['TDS Ledger'] = ''
+
+            # Get 'SupplierName' and 'SupplierState' from table_5.csv matching 'TotalTaxAmt' closest to sum_brokerage
+            table_5['TotalTaxAmt_cleaned'] = (
+                table_5['TotalTaxAmt']
+                .astype(str)
+                .str.replace(',', '')
+                .str.replace(')', '')
+                .str.replace('(', '')
+                .astype(float)
+            )
+            table_5['Brokerage_Diff'] = abs(table_5['TotalTaxAmt_cleaned'] - sum_brokerage)
+            # Remove letters/strings from 'SupplierCode' and keep only numbers
+            table_5['SupplierCode_numeric'] = table_5['SupplierCode'].astype(str).str.extract('(\d+)', expand=False)
+            # Map 'Branch' in processed_df to 'SupplierState' using 'SupplierCode_numeric'
+            supplier_code_state_map = table_5.set_index('SupplierCode_numeric')['SupplierState'].to_dict()
+            processed_df['SupplierState'] = processed_df['Branch'].map(supplier_code_state_map).fillna('')
+            print(f"Branch mapping completed. Unique SupplierStates after mapping: {processed_df['SupplierState'].unique()}")
+
+            # Handle 'GST TDS' per 'SupplierState'
+            # Identify 'GST TDS' column
             if 'GST TDS' in table_5.columns:
                 gst_tds_col = 'GST TDS'
             elif 'GST TDS@2%' in table_5.columns:
@@ -22079,7 +22257,7 @@ def process_national_insurance_limited(
             else:
                 raise ValueError("No 'GST TDS' column found in table_5.")
 
-            # Identify 'Invoice No.' column in table_5
+            # Identify 'Invoice No.' column
             invoice_no_col = None
             for col in ['Invoice No.', 'Invoice No', 'INVOICENO', 'invoice no']:
                 if col in table_5.columns:
@@ -22088,7 +22266,7 @@ def process_national_insurance_limited(
             if invoice_no_col is None:
                 raise ValueError("No 'Invoice No.' column found in table_5.")
 
-            # Clean and convert 'GST TDS' column to float
+            # Clean and convert the columns to float
             table_5['GST_TDS_cleaned'] = (
                 table_5[gst_tds_col]
                 .astype(str)
@@ -22100,7 +22278,7 @@ def process_national_insurance_limited(
             table_5['SupplierState_cleaned'] = table_5['SupplierState'].astype(str).str.strip().str.lower()
             print(f"GST TDS column identified: {gst_tds_col}")
 
-            # Group by 'SupplierState_cleaned' and sum 'GST_TDS_cleaned', concatenate 'Invoice No.'
+            # Group by 'SupplierState' and sum 'GST_TDS_cleaned', and concatenate 'Invoice No.'
             gst_tds_state_invoices = table_5.groupby('SupplierState_cleaned').agg({
                 'GST_TDS_cleaned': 'sum',
                 invoice_no_col: lambda x: ', '.join(x.astype(str))
@@ -22129,23 +22307,25 @@ def process_national_insurance_limited(
             total_gst_tds = gst_tds_state_invoices['GST_TDS_cleaned'].sum()
             print(f"Total GST TDS: {total_gst_tds}")
 
-            # Calculate 'third_new_row_brokerage'
+            # Calculate 'gst_tds_18_percent' and 'third_new_row_brokerage'
+            gst_tds_18_percent = sum_brokerage * 0.18
+            total_brokerage_with_new_rows = sum_brokerage + gst_tds_18_percent - total_gst_tds
             narration_value_float = float(str(narration_value_original).replace(',', ''))
-            third_new_row_brokerage = narration_value_float - (sum_brokerage + gst_tds_18_percent - total_gst_tds)
+            third_new_row_brokerage = narration_value_float - total_brokerage_with_new_rows
             print(f"Calculated gst_tds_18_percent: {gst_tds_18_percent}")
             print(f"Calculated third_new_row_brokerage: {third_new_row_brokerage}")
 
             # Create the additional rows
             new_rows = []
 
-            # 'GST Receipts' row with invoice numbers included in 'Client Name'
+            # 'GST Receipts' row
             new_rows.append({
                 'Entry No.': '',
                 'Debtor Name': processed_df['Debtor Name'].iloc[0],
                 'Nature of Transaction': "GST Receipts",
                 'AccountType': processed_df['AccountType'].iloc[0],
                 'Debtor Branch Ref': processed_df['Debtor Branch Ref'].iloc[0],
-                'Client Name': f"GST @ 18% - Invoice {invoice_no}",  # Included invoice number
+                'Client Name': "GST @ 18%",
                 'Policy No.': '',
                 'Risk': '',
                 'Endorsement No.': "",
@@ -22155,17 +22335,17 @@ def process_national_insurance_limited(
                 'Premium': '0.00',
                 'Brokerage Rate': '',
                 'Brokerage': gst_tds_18_percent,
-                'Narration': narration,  # Updated narration
+                'Narration': '',  # Will be updated below
                 'NPT': '',
                 'Bank Ledger': bank_ledger_value,
                 'AccountTypeDuplicate': processed_df['AccountTypeDuplicate'].iloc[0],
                 'Service Tax Ledger': processed_df['Service Tax Ledger'].iloc[0],
-                'TDS Ledger': f"GST @ 18% - Invoice {invoice_no}",  # TDS Ledger same as Client Name
-                'RepDate': datetime.today().strftime('%d-%b-%y'),
-                'Branch': '',  # Branch left blank for additional rows
+                'TDS Ledger': "GST @ 18%",  # Same as 'Client Name'
+                'RepDate': processed_df['RepDate'].iloc[-1],
+                'Branch': '',  # Empty for additional rows
                 'Income category': processed_df['Income category'].iloc[-1],
                 'ASP Practice': processed_df['ASP Practice'].iloc[-1],
-                'P & L JV': invoice_no,  # Included invoice number
+                'P & L JV': invoice_no,  # Include invoice numbers
                 'NPT2': processed_df['NPT2'].iloc[-1]
             })
 
@@ -22176,8 +22356,8 @@ def process_national_insurance_limited(
                 name_ay_2025_26 = row2['Name-AY 2025-26']
                 gl_no = row2['Gl No']
                 invoice_no_concat = row2[invoice_no_col]
-                # Map 'SupplierState' to 'Branch' using 'state_lookups.xlsx' Sheet2
-                branch_value = ''  # Branch is left blank for additional rows
+                # Map 'SupplierState' to 'Branch' using 'state_lookups.xlsx'
+                branch_value = branch_map.get(supplier_state, '')
                 new_rows.append({
                     'Entry No.': '',
                     'Debtor Name': processed_df['Debtor Name'].iloc[0],
@@ -22194,22 +22374,22 @@ def process_national_insurance_limited(
                     'Premium': '0.00',
                     'Brokerage Rate': '',
                     'Brokerage': gst_tds_amount,
-                    'Narration': narration,  # Updated narration
+                    'Narration': '',
                     'NPT': '',
                     'Bank Ledger': bank_ledger_value,
                     'AccountTypeDuplicate': 'G/L Account',
                     'Service Tax Ledger': gl_no,
-                    'TDS Ledger': name_ay_2025_26,  # TDS Ledger same as Client Name
-                    'RepDate': datetime.today().strftime('%d-%b-%y'),
-                    'Branch': '',  # Branch left blank for additional rows
+                    'TDS Ledger': name_ay_2025_26,  # Same as 'Client Name'
+                    'RepDate': processed_df['RepDate'].iloc[-1],
+                    'Branch': '',  # Empty for additional rows
                     'Income category': processed_df['Income category'].iloc[-1],
                     'ASP Practice': processed_df['ASP Practice'].iloc[-1],
-                    'P & L JV': invoice_no_concat,  # Included invoice number
+                    'P & L JV': invoice_no_concat,
                     'NPT2': processed_df['NPT2'].iloc[-1]
                 })
             print(f"Added {len(gst_tds_state_invoices)} Brokerage Statement rows for GST TDS.")
 
-            # 'TDS Receivable - AY 2025-26' row with invoice numbers included in 'P & L JV'
+            # 'TDS Receivable - AY 2025-26' row
             new_rows.append({
                 'Entry No.': '',
                 'Debtor Name': processed_df['Debtor Name'].iloc[0],
@@ -22226,17 +22406,17 @@ def process_national_insurance_limited(
                 'Premium': '0.00',
                 'Brokerage Rate': '',
                 'Brokerage': third_new_row_brokerage,
-                'Narration': narration,  # Updated narration
+                'Narration': '',
                 'NPT': '',
                 'Bank Ledger': bank_ledger_value,
                 'AccountTypeDuplicate': 'G/L Account',
                 'Service Tax Ledger': '2300022',
-                'TDS Ledger': "TDS Receivable - AY 2025-26",  # TDS Ledger same as Client Name
-                'RepDate': datetime.today().strftime('%d-%b-%y'),
-                'Branch': '',  # Branch left blank for additional rows
+                'TDS Ledger': "TDS Receivable - AY 2025-26",  # Same as 'Client Name'
+                'RepDate': processed_df['RepDate'].iloc[-1],
+                'Branch': '',  # Empty for additional rows
                 'Income category': processed_df['Income category'].iloc[-1],
                 'ASP Practice': processed_df['ASP Practice'].iloc[-1],
-                'P & L JV': invoice_no,  # Included invoice number
+                'P & L JV': invoice_no,  # Use concatenated Invoice No.s
                 'NPT2': processed_df['NPT2'].iloc[-1]
             })
             print("Added 'TDS Receivable - AY 2025-26' row.")
@@ -22322,4 +22502,5 @@ def process_national_insurance_limited(
     except Exception as e:
         print(f"Error processing National Insurance Company Limited data: {str(e)}", file=sys.stderr)
         raise
+
 
