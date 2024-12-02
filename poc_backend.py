@@ -21859,46 +21859,7 @@ def process_national_insurance_limited(
             processed_df['TDS Ledger'] = ''
             processed_df['RepDate'] = datetime.today().strftime('%d-%b-%y')
             processed_df['NPT2'] = subject.replace('FW:', '').replace('RE:', '').strip()
-
-            # Add other necessary columns with empty values or default values
-            processed_df['Debtor Branch Ref'] = ''
-            processed_df['Branch'] = ''
-            processed_df['Income category'] = ''
-            processed_df['ASP Practice'] = ''
-            processed_df['NPT'] = ''
-            processed_df['Bank Ledger'] = ''
-            processed_df['Service Tax Ledger'] = ''
-            processed_df['P & L JV'] = ''
-            processed_df['Narration'] = ''
-            processed_df['Policy Type'] = ''
-            print("Necessary columns added.")
-
             # Handle 'Policy No.' and 'Endorsement No.'
-            if 'Policy No.' in processed_df.columns:
-                def split_policy_no(policy_no):
-                    if pd.isnull(policy_no):
-                        return policy_no, ''
-                    policy_no_str = str(policy_no).strip().replace("'", "")  # Remove any ' symbols
-                    if '-' in policy_no_str:
-                        policy_parts = policy_no_str.split('-')
-                    elif '/' in policy_no_str:
-                        policy_parts = policy_no_str.split('/')
-                    else:
-                        policy_parts = [policy_no_str]
-
-                    if len(policy_parts) > 1:
-                        endorsement_no = policy_parts[-1]
-                        if endorsement_no in ['0', '00', '000']:
-                            endorsement_no = ''
-                        policy_no_main = '-'.join(policy_parts[:-1])
-                    else:
-                        endorsement_no = ''
-                        policy_no_main = policy_no_str
-                    return policy_no_main, endorsement_no
-
-                policy_endorsement = processed_df['Policy No.'].apply(split_policy_no)
-                processed_df['Policy No.'], processed_df['Endorsement No.'] = zip(*policy_endorsement)
-            print("Policy and Endorsement numbers processed.")
 
             # Clean numeric columns
             numeric_columns = ['Premium', 'Brokerage Rate', 'Brokerage']
