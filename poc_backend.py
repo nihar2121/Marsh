@@ -21738,6 +21738,24 @@ def kotak_life_insurance_co(file_path, template_data, risk_code_data, cust_neft_
         print(f"Error processing Kotak Mahindra Life Insurance Company Limited(Previously Know As Kotak Mahindra: {str(e)}")
         raise
 
+import os
+import sys
+import re  # Added for regex operations
+import pandas as pd
+import numpy as np
+from datetime import datetime
+import shutil  # If needed for file operations
+
+def parse_date_flexible(date_str):
+    """
+    Function to parse dates flexibly. Implementation needed.
+    Placeholder implementation:
+    """
+    try:
+        return pd.to_datetime(date_str, dayfirst=False)
+    except:
+        return pd.NaT
+
 def process_national_insurance_limited(
     file_path,
     template_data,
@@ -21856,10 +21874,42 @@ def process_national_insurance_limited(
             processed_df['AccountType'] = "Customer"
             processed_df['AccountTypeDuplicate'] = processed_df['AccountType']
             processed_df['Nature of Transaction'] = "Brokerage Statement"
-            processed_df['TDS Ledger'] = ''
+            # Set 'TDS Ledger' as a copy of 'Client Name' (excluding additional rows)
+            if 'Client Name' in processed_df.columns:
+                processed_df['TDS Ledger'] = processed_df['Client Name']
+            else:
+                processed_df['TDS Ledger'] = ''
             processed_df['RepDate'] = datetime.today().strftime('%d-%b-%y')
             processed_df['NPT2'] = subject.replace('FW:', '').replace('RE:', '').strip()
             # Handle 'Policy No.' and 'Endorsement No.'
+
+            # Remove '";: symbols from Policy No. and Endorsement No.
+            if 'Policy No.' in processed_df.columns:
+                def split_policy_no(policy_no):
+                    if pd.isnull(policy_no):
+                        return policy_no, ''
+                    # Remove '";: symbols using regex
+                    policy_no_str = re.sub(r'[\'";:]', '', str(policy_no).strip())
+                    if '-' in policy_no_str:
+                        policy_parts = policy_no_str.split('-')
+                    elif '/' in policy_no_str:
+                        policy_parts = policy_no_str.split('/')
+                    else:
+                        policy_parts = [policy_no_str]
+
+                    if len(policy_parts) > 1:
+                        endorsement_no = policy_parts[-1]
+                        if endorsement_no in ['0', '00', '000']:
+                            endorsement_no = ''
+                        policy_no_main = '-'.join(policy_parts[:-1])
+                    else:
+                        endorsement_no = ''
+                        policy_no_main = policy_no_str
+                    return policy_no_main, endorsement_no
+
+                policy_endorsement = processed_df['Policy No.'].apply(split_policy_no)
+                processed_df['Policy No.'], processed_df['Endorsement No.'] = zip(*policy_endorsement)
+            print("Policy and Endorsement numbers processed.")
 
             # Clean numeric columns
             numeric_columns = ['Premium', 'Brokerage Rate', 'Brokerage']
@@ -21895,15 +21945,15 @@ def process_national_insurance_limited(
                 # Clean 'SupplierCode' in table_5 to remove letters/strings and keep only numbers
                 table_5['SupplierCode_numeric'] = table_5['SupplierCode'].astype(str).str.extract('(\d+)', expand=False)
                 table_5['SupplierCode_numeric'] = table_5['SupplierCode_numeric'].astype(str).str.strip()
-                
+
                 # Debugging: Print unique SupplierCode_numeric and Branch_numeric
                 print(f"Unique SupplierCode_numeric in table_5: {table_5['SupplierCode_numeric'].unique()}")
-                
+
                 # Clean 'Branch' in processed_df to ensure it's comparable
                 # Extract numeric parts from 'Branch'
                 processed_df['Branch_numeric'] = processed_df['Branch'].astype(str).str.extract('(\d+)', expand=False)
                 processed_df['Branch_numeric'] = processed_df['Branch_numeric'].astype(str).str.strip()
-                
+
                 # Debugging: Print unique Branch_numeric
                 print(f"Unique Branch_numeric in processed_df: {processed_df['Branch_numeric'].unique()}")
 
@@ -21932,7 +21982,7 @@ def process_national_insurance_limited(
                 # Map 'SupplierState' to 'Branch' shortform
                 processed_df['Branch'] = processed_df['SupplierState'].str.lower().map(branch_lookup).fillna(processed_df['SupplierState'])
 
-                # Drop the temporary 'Branch_numeric' column
+                # Drop the temporary 'Branch_numeric' and 'SupplierState' columns
                 processed_df = processed_df.drop(columns=['Branch_numeric', 'SupplierState'])
                 print(f"Branch mapping completed. Unique branches after mapping: {processed_df['Branch'].unique()}")
             else:
@@ -21943,7 +21993,7 @@ def process_national_insurance_limited(
             # Implement Endorsement logic
             if 'Endorsement No.' in processed_df.columns and 'P & L JV' in processed_df.columns:
                 def process_endorsement(row):
-                    endorsement_no = str(row['Endorsement No.']).strip().replace("'", "")
+                    endorsement_no = str(row['Endorsement No.']).strip().replace("'", "").replace('"', '').replace(';', '').replace(':', '')
                     if endorsement_no in ['0', '00', '000']:
                         row['Endorsement No.'] = ''
                         row['P & L JV'] = ''
@@ -22009,6 +22059,7 @@ def process_national_insurance_limited(
             else:
                 debtor_branch_ref = ''
             processed_df['Debtor Branch Ref'] = debtor_branch_ref
+            # Updated 'Service Tax Ledger' as per user instructions
             processed_df['Service Tax Ledger'] = processed_df['Debtor Branch Ref'].str.replace('CUST_NEFT_', '', regex=False)
             processed_df['Debtor Name'] = insurer_name
 
@@ -22037,6 +22088,89 @@ def process_national_insurance_limited(
                 else:
                     narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} without GST 18%"
             processed_df['Narration'] = narration
+            print("Narration constructed.")
+
+            # === Begin of Additional Processing ===
+
+            # Calculate sum of 'Brokerage'
+            sum_brokerage = processed_df['Brokerage'].astype(float).sum()
+            print(f"Sum of brokerage: {sum_brokerage}")
+
+            # Get 'Net Amount' from 'table_3'
+            net_amount_column = table_3.columns[-1]
+            net_amount_values_cleaned = table_3[net_amount_column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
+            net_amount_values_numeric = pd.to_numeric(net_amount_values_cleaned, errors='coerce').fillna(0)
+            # Take the first value instead of sum
+            if len(net_amount_values_numeric) > 0:
+                net_amount_value = net_amount_values_numeric.iloc[0]
+            else:
+                net_amount_value = 0.0
+            net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
+            print(f"Net amount from 'table_3' is {net_amount_value}")
+
+            # Check if sum_brokerage is approximately equal to net_amount_value
+            brokerage_equals_net_amount = np.isclose(sum_brokerage, net_amount_value, atol=0.01)
+
+            # Get details from 'table_4'
+            amount_values_cleaned = table_4['Amount'].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
+            amount_values_numeric = pd.to_numeric(amount_values_cleaned, errors='coerce').fillna(0)
+            amount_total = amount_values_numeric.sum()
+            narration_value_original = "{:,.2f}".format(amount_total)
+
+            bank_value = table_4['Bank'].iloc[0] if 'Bank' in table_4.columns else ''
+
+            date_col = table_4['Date'].iloc[0] if 'Date' in table_4.columns else datetime.today().strftime('%d/%m/%Y')
+
+            insurer_name = table_4['Insurer Name'].iloc[0] if 'Insurer Name' in table_4.columns else ''
+            if 'Narration' in table_4.columns and not table_4['Narration'].empty:
+                narration_from_table_4 = table_4['Narration'].iloc[0]
+            elif 'Narration (Ref)' in table_4.columns and not table_4['Narration (Ref)'].empty:
+                narration_from_table_4 = table_4['Narration (Ref)'].iloc[0]
+            else:
+                narration_from_table_4 = ''
+
+            # Get 'GST' presence in 'table_3' columns
+            gst_present = any('GST' in col or 'GST @18%' in col for col in table_3.columns)
+
+            # Remove special characters from 'Narration' for file naming
+            safe_narration = ''.join(e for e in narration_from_table_4 if e.isalnum() or e == ' ').strip()
+
+            # Get 'Debtor Branch Ref' from 'cust_neft_data' using 'Insurer Name'
+            debtor_branch_ref_row = cust_neft_data[cust_neft_data['Name'].str.lower() == insurer_name.lower()]
+            if not debtor_branch_ref_row.empty:
+                debtor_branch_ref = debtor_branch_ref_row['No.2'].iloc[0]
+            else:
+                debtor_branch_ref = ''
+            processed_df['Debtor Branch Ref'] = debtor_branch_ref
+            # 'Service Tax Ledger' already set earlier
+            processed_df['Debtor Name'] = insurer_name
+
+            # Convert date to dd/mm/yyyy format
+            try:
+                date_col_formatted = pd.to_datetime(date_col).strftime('%d/%m/%Y')
+            except:
+                date_col_formatted = ''
+
+            # Get 'supplier_name_col' from 'table_4'
+            supplier_name_col = ''
+            for col in ['Insurer Name', 'Insurer', 'SupplierName']:
+                if col in table_4.columns and not table_4[col].empty:
+                    supplier_name_col = table_4[col].iloc[0]
+                    break
+
+            # Create narration considering GST and value in brackets
+            if gst_present:
+                if not np.isclose(float(narration_value_original.replace(',', '')), net_amount_value, atol=0.01):
+                    narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} ({net_amount_value_formatted}) from {supplier_name_col} with GST 18%"
+                else:
+                    narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} with GST 18%"
+            else:
+                if not np.isclose(float(narration_value_original.replace(',', '')), net_amount_value, atol=0.01):
+                    narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} ({net_amount_value_formatted}) from {supplier_name_col} without GST 18%"
+                else:
+                    narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} without GST 18%"
+            processed_df['Narration'] = narration
+            print("Narration re-constructed after additional processing.")
 
             # === Begin of Additional Processing ===
 
@@ -22376,3 +22510,4 @@ def process_national_insurance_limited(
     except Exception as e:
         print(f"Error processing National Insurance Company Limited data: {str(e)}", file=sys.stderr)
         raise
+
