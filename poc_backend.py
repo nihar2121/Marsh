@@ -4584,7 +4584,7 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
         processed_df['Debtor Name'] = (
             processed_df['Debtor Name']
             if 'Debtor Name' in processed_df.columns
-            else 'ICICI Prudential Life Insurance'
+            else 'ICICI Prudential Life Insurance Co. Ltd'
         )
         processed_df['AccountType'] = "Customer"
         processed_df['AccountTypeDuplicate'] = processed_df['AccountType']
@@ -15327,26 +15327,30 @@ def process_iffco_tokyo_insurer(file_path, template_data, risk_code_data, cust_n
 
             # Check for blank fields after mapping and before adding GST/TDS rows
             required_fields = ['Client Name', 'Policy No.', 'Risk', 'Policy Start Date', 'Policy End Date', 'Premium']
-            blank_rows_info = []
-            for i, row in processed_df.iterrows():
-                blanks = []
-                for field in required_fields:
-                    if field in processed_df.columns:
-                        if pd.isna(row[field]) or str(row[field]).strip() == '':
-                            blanks.append(field)
-                if blanks and row.drop(labels=required_fields).notna().any():
-                    blank_rows_info.append({'Row': i + 1, 'Missing Fields': blanks})
+            missing_required = False
 
-            if blank_rows_info:
-                error_messages = [
-                    f"Row {info['Row']}: Missing fields - {', '.join(info['Missing Fields'])}"
-                    for info in blank_rows_info
-                ]
-                error_message = "The following rows have missing required fields:\n" + "\n".join(error_messages)
+            # Iterate through each required field to check for missing values
+            for field in required_fields:
+                if field not in processed_df.columns:
+                    missing_required = True
+                    break
+                if processed_df[field].isnull().any() or (processed_df[field].astype(str).str.strip() == '').any():
+                    missing_required = True
+                    break
+
+            # Handle missing required fields
+            if missing_required:
+                error_message = (
+                    "Missing required fields in the dataset.\n"
+                    "    Please ensure all required fields are filled.\n"
+                    "    Check for empty cells in the required columns.\n"
+                    "    Validate the data before processing."
+                )
                 print(error_message)
                 raise ValueError(error_message)
             else:
                 print("No missing required fields found.")
+
 
             # 'P & L JV' logic continues here...
 
