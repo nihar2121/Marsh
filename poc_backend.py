@@ -21828,7 +21828,7 @@ def process_national_insurance_limited(
             # Remove ' ", ; : symbols from 'Policy No.' and 'Endorsement No.' columns
             for col_name in ['Policy No.', 'Endorsement No.']:
                 if col_name in df.columns:
-                    df[col_name] = df[col_name].astype(str).str.replace(r'[\'";:]', '', regex=True)
+                    df[col_name] = df[col_name].astype(str).str.replace(r'[\'";:`]', '', regex=True)
 
             # Create a copy of the template_data
             processed_df = template_data.copy()
