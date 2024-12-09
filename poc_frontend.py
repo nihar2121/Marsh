@@ -1252,6 +1252,91 @@ def select_insurer():
                 'PREMIUM_AMOUNT': 'Premium',
                 'COMMISSION_AMOUNT': 'Brokerage'
                                                       } 
+        elif selected_insurer == 'Aviva Life Insurance Co. India Pvt. Ltd.':
+
+            read_tables_from_email(email_body, selected_insurer)  # Pass the selected insurer to the function
+            default_mappings = {
+                'Risk Code': 'Risk',
+                'Policy No': 'Policy No.',
+                'Policy Name': 'Client Name',
+                'POLICY_EXP_DATE': 'Policy End Date',
+                'DOC': 'Policy Start Date',
+                'OFFICE_CODE': 'Branch',
+                'Type': 'Income Category',
+                'ENDORSEMENT_NUMBER': 'Endorsement No.',
+                'Master Pol. No.': 'ASP Practice',
+                '': 'P & L JV',
+                'Premium Collected': 'Premium',
+                'Commission Amount': 'Brokerage'
+                                                      }
+            # **PDF to Excel Conversion for Aviva Life Insurance Co. India Pvt. Ltd.**
+            try:
+                # Ensure the attachment is a PDF
+                if file_attachment and file_attachment.lower().endswith('.pdf'):
+                    pdf_file_path = file_attachment
+                    base_name = os.path.splitext(os.path.basename(pdf_file_path))[0]
+                    output_cleaned_excel_path = os.path.join(os.path.dirname(pdf_file_path), f"{base_name}_cleaned.xlsx")
+
+                    # Extract tables from the PDF using Camelot
+                    tables = camelot.read_pdf(pdf_file_path, pages="1", flavor="stream")  # Use 'stream' for bordered tables
+
+                    # Check if any tables were extracted
+                    if tables.n > 0:
+                        # Save the raw extracted table
+                        raw_df = tables[0].df
+                        print("Raw Extracted Table:\n", raw_df.head())  # Debug: Print the extracted table structure
+                        # raw_df.to_excel(output_raw_excel_path, index=False, header=False)  # Not saving raw as per user instruction
+
+                        # Clean the DataFrame
+                        df = raw_df[2:]  # Skip the first two rows (header and extra row)
+                        df = df.reset_index(drop=True)  # Reset the index
+
+                        # Explicitly use column D (index 3) for Policy Name
+                        # Ensure there are enough columns
+                        if df.shape[1] >= 4:
+                            df = df.iloc[:, [0, 3, -3, -2, -1]]  # Policy No (0), Policy Name (3), Month (-3), Premium Collected (-2), Commission Amount (-1)
+                            df.columns = ["Policy No", "Policy Name", "Month", "Premium Collected", "Commission Amount"]
+
+                            # Remove rows with invalid numeric data (e.g., headers that were not properly removed)
+                            df = df[~df["Premium Collected"].str.contains("Premium Collected", na=False)]  # Drop rows containing column headers
+
+                            # Forward-fill missing Policy Name values if any
+                            df["Policy Name"] = df["Policy Name"].replace("", None).fillna(method="ffill")
+
+                            # Remove invalid rows with empty Policy No
+                            df = df[df["Policy No"].str.strip().astype(bool)]
+
+                            # Clean numeric columns (remove commas, handle empty cells, and convert to float)
+                            df["Premium Collected"] = (
+                                df["Premium Collected"]
+                                .str.replace(",", "", regex=False)
+                                .replace("", "0")  # Replace empty strings with 0
+                                .astype(float)
+                            )
+                            df["Commission Amount"] = (
+                                df["Commission Amount"]
+                                .str.replace(",", "", regex=False)
+                                .replace("", "0")  # Replace empty strings with 0
+                                .astype(float)
+                            )
+
+                            # Save the cleaned DataFrame to an Excel file
+                            df.to_excel(output_cleaned_excel_path, index=False)
+                            print(f"Cleaned data extracted and saved to {output_cleaned_excel_path}")
+
+                            # Update the attachment to the cleaned Excel file
+                            file_attachment = output_cleaned_excel_path
+                            file_path_n = output_cleaned_excel_path
+                        else:
+                            print("Not enough columns to perform cleaning.")
+                    else:
+                        print("No tables found in the PDF.")
+                else:
+                    print("Attachment is not a PDF. Skipping conversion.")
+            except Exception as e:
+                print(f"Error during PDF to Excel conversion: {str(e)}")
+                return jsonify({'message': f"Error during PDF to Excel conversion: {str(e)}"}), 400
+
         else:
             # Ensure there's a fallback for other insurers
             default_mappings = {
@@ -1319,7 +1404,8 @@ def edit_mappings():
         'Edelweiss Tokio Life Insurance Company Limited':0,
         'Shriram Life Insurance Company Limited':0,
         'Aegon Life Insurance Company Private Limited':0,
-        'IndiaFirst Life Insurance Company Ltd':0            # Add more insurers as needed
+        'IndiaFirst Life Insurance Company Ltd':0,
+        'Aviva Life Insurance Co. India Pvt. Ltd.':0 # Add more insurers as needed
     }
 
     header_row = header_rows.get(selected_insurer, 0)  # Default to 0 if not specified
@@ -1501,7 +1587,7 @@ def read_tables_from_email(email_body, selected_insurer):
 
     supported_insurers = [
         'The New India Assurance Co', 'The Oriental Insurance Co', 'United India Insurance',
-        'National Insurance Company Limited','ICICI Lombard General Insurance Co. Ltd.', 'Star Health Insurance', 'Hdfc Life Insurance Co. Ltd.',
+        'Aviva Life Insurance Co. India Pvt. Ltd.','National Insurance Company Limited','ICICI Lombard General Insurance Co. Ltd.', 'Star Health Insurance', 'Hdfc Life Insurance Co. Ltd.',
         'Kotak Mahindra Life Insurance Company Limited(Previously Know As Kotak Mahindra','IndiaFirst Life Insurance Company Ltd','Shriram General Insurance Company Limited', 'Kotak Mahindra General Insurance Company',
         'Shriram Life Insurance Company Limited','Edelweiss Tokio Life Insurance Company Limited','Universal Sampo Insurance', 'Zuno General Insurance Limited', 'ICICI Prudential Life Insurance Co Ltd','Niva Bupa Health Insurance Company Limited (Previously Known As Max Bupa Health',
         'Aegon Life Insurance Company Private Limited','Go Digit Life Insurance Limited','Pnb Metlife India Insurance Company Ltd (Pre. Met Life India Insurance Company P','Pramerica Life Insurance Limited','Max Life Insurance Co. Ltd. ( Prev. Known As Max New York Life Insurance Co. Ltd','Aditya Birla Sun Life Insurance Company Limited','SBI Life Insurance Company Limited','IFFCO TOKIO General Insurance Co. Ltd.','Star Union Dai-Ichi Life Insurance Company Ltd','Future Generali India Life Insurance Co Ltd','Aditya Birla Health Insurance Co.Ltd.','Manipal Cigna Health Insurance Company Limited (Prev. Cigna Ttk Health Insurance','Future Generali India Insurance Company Limited','Magma Hdi General Insurance Company Limited','Care Health Insurance Limited','Bajaj Allianz Life Insurance Company Limited','Reliance General Insurance Co. Ltd.','Hdfc Ergo General Insurance Company Limited','Bajaj Allianz General Insurance Co. Ltd.','Tata AIG General Insurance Co. Ltd.','Royal Sundaram General Insurance Co Ltd','Raheja Qbe General Insurance Company Limited','GoDigit General Insurance Limited','Acko General Insurance Limited','SBI General Insurance Company Limited','Cholamandalam General Insurance Co. Ltd.', 'Tata AIA Insurance','Liberty Videocon General Insurance Co. Ltd'
