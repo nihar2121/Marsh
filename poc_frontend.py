@@ -8,11 +8,10 @@ import extract_msg  # To read .msg files
 from bs4 import BeautifulSoup
 import openpyxl
 # Importing the backend functions
-from poc_backend import  process_national_insurance_limited,kotak_life_insurance_co,process_indialife_first_insurance, proces_aegon_life_insurance_co,process_shriram_life_insurance_co, process_edelweiss_tokio_life_insurance,process_niva_bupa_health_insurance,process_go_digit_life_insurance,process_pnb_metlife_insurance,process_pramerica_life_insurance,process_max_life_insurance,process_aditya_birla_sun_life ,process_sbi_life_insurance_co,process_iffco_tokyo_insurer,process_star_india_diachi,process_future_generalli_life_insurance,process_aditya_insurance_co,process_manipal_health_insurance_company,process_generali_india_insurance_company,process_magma_hdi_general_insurance_company,process_care_health_insurance_limited,process_bajaj_allianz_life_insurance,process_relaince_general_insurance_co, process_hdfc_ergo_insurance, process_bajaj_allianz_insurance,process_tata_aig_insurance,process_royal_sundaram_general_insurance,process_raheja_general_insurance,process_godigit_general_insurance,proess_acko_general_insurance,process_sbi_general_insurance,process_liberty_general_insurance,process_cholamandalam_general_insurance,process_icici_prudential_life_insurance,process_zuna_general_insurance, process_universal_sampo_insurance,process_kotak_mahindra_insurance,process_shriram_general_insurance,process_hdfc_life_insurance_co,process_star_health_insurer,read_lookup_files,process_icici_lombard_insurance, process_new_india_assurance,process_oriental_insurance_co, process_united_india_insurance,process_tata_aia_insurance
+from poc_backend import  process_aviva_insurance_co,process_national_insurance_limited,kotak_life_insurance_co,process_indialife_first_insurance, proces_aegon_life_insurance_co,process_shriram_life_insurance_co, process_edelweiss_tokio_life_insurance,process_niva_bupa_health_insurance,process_go_digit_life_insurance,process_pnb_metlife_insurance,process_pramerica_life_insurance,process_max_life_insurance,process_aditya_birla_sun_life ,process_sbi_life_insurance_co,process_iffco_tokyo_insurer,process_star_india_diachi,process_future_generalli_life_insurance,process_aditya_insurance_co,process_manipal_health_insurance_company,process_generali_india_insurance_company,process_magma_hdi_general_insurance_company,process_care_health_insurance_limited,process_bajaj_allianz_life_insurance,process_relaince_general_insurance_co, process_hdfc_ergo_insurance, process_bajaj_allianz_insurance,process_tata_aig_insurance,process_royal_sundaram_general_insurance,process_raheja_general_insurance,process_godigit_general_insurance,proess_acko_general_insurance,process_sbi_general_insurance,process_liberty_general_insurance,process_cholamandalam_general_insurance,process_icici_prudential_life_insurance,process_zuna_general_insurance, process_universal_sampo_insurance,process_kotak_mahindra_insurance,process_shriram_general_insurance,process_hdfc_life_insurance_co,process_star_health_insurer,read_lookup_files,process_icici_lombard_insurance, process_new_india_assurance,process_oriental_insurance_co, process_united_india_insurance,process_tata_aia_insurance
 from datetime import datetime
 from urllib.parse import unquote_plus
-import camelot
-
+import xlrd
 app = Flask(__name__)
 
 # Global variable to hold the attachment data and mappings between requests
@@ -492,7 +491,7 @@ def select_insurer():
 
     # Read the Insurer_Names.xlsx file
     insurer_file_path = r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller\Common folder AP & AR\Brokerage Statement Automation\support files\Insurer_Names.xlsx'
-    insurer_df = pd.read_excel(insurer_file_path)
+    insurer_df = pd.read_excel(insurer_file_path, engine = 'openpyxl')
 
     # Extract the insurer names for the dropdown
     insurers = insurer_df['Insurer_Name'].tolist()
@@ -1418,7 +1417,7 @@ def edit_mappings():
             if file_attachment.endswith('.xlsx'):
                 try:
                     # Try reading with default engine first
-                    file_df = pd.read_excel(file_attachment, header=header_row)
+                    file_df = pd.read_excel(file_attachment, header=header_row, engine='openpyxl')
                 except Exception as e:
                     # If any error occurs, try reading with calamine engine
                     file_df = pd.read_excel(file_attachment, header=header_row, engine='calamine')
