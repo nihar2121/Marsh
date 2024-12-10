@@ -14383,21 +14383,31 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
                 if attachment_col in data.columns:
                     # For specific columns, enforce string type to preserve leading zeros
                     if template_col in ['ASP Practice', 'Branch', 'Income category']:
-                        processed_df[template_col] = data[attachment_col].astype(str)
+                        processed_df[template_col] = data[attachment_col].astype(str).str.strip()
+                        print(f"Mapped '{attachment_col}' to '{template_col}' as string.")
                     else:
                         processed_df[template_col] = data[attachment_col]
-                    print(f"Mapped '{attachment_col}' to '{template_col}'.")
+                        print(f"Mapped '{attachment_col}' to '{template_col}'.")
                 else:
-                    processed_df[template_col] = ''
-                    print(f"Column '{attachment_col}' not found in data. Filled '{template_col}' with empty strings.")
+                    # If the attachment column is not found, fill the template column with empty strings
+                    if template_col in ['ASP Practice', 'Branch', 'Income category']:
+                        processed_df[template_col] = data.get(template_col, '').astype(str).str.strip()
+                        print(f"Column '{attachment_col}' not found in data. Filled '{template_col}' with empty strings as string.")
+                    else:
+                        processed_df[template_col] = ''
+                        print(f"Column '{attachment_col}' not found in data. Filled '{template_col}' with empty strings.")
         else:
             print("No mappings provided. Proceeding without mappings.")
 
-        # **Ensure 'Income category' and 'ASP Practice' columns are present with exact capitalization**
+        # **Ensure 'Income category' and 'ASP Practice' columns are present with exact capitalization and as strings**
         for col in ['Income category', 'ASP Practice']:
             if col not in processed_df.columns:
                 processed_df[col] = ''
-                print(f"Added missing column '{col}' to processed_df.")
+                print(f"Added missing column '{col}' to processed_df as string.")
+            else:
+                # Ensure they are treated as strings to preserve leading zeros
+                processed_df[col] = processed_df[col].astype(str).str.strip()
+                print(f"Ensured '{col}' is treated as string.")
 
         # Debug: Check if 'Income category' is populated after mapping
         if 'Income category' in processed_df.columns:
@@ -14434,6 +14444,7 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
             ].to_dict()
             # Update Branch mapping and preserve original value if mapping fails
             processed_df['Branch'] = processed_df['Branch'].map(branch_lookup).fillna(processed_df['Branch'])
+            print("Processed 'Branch' column with state lookups.")
         else:
             processed_df['Branch'] = ''
             print("'Branch' column not found in processed_df. Filled with empty strings.")
@@ -14442,6 +14453,7 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
         numeric_columns = ['Premium', 'Brokerage']
         for column in numeric_columns:
             if column in processed_df.columns:
+                # Remove commas and parentheses, then convert to numeric
                 processed_df[column] = (
                     processed_df[column]
                     .astype(str)
@@ -14488,6 +14500,7 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
             if 'Debtor Name' in processed_df.columns
             else 'Future Generali India Life Insurance Company Ltd.'
         )
+        processed_df['Debtor Name'] = processed_df['Debtor Name'].astype(str).str.strip()
         processed_df['AccountType'] = "Customer"
         processed_df['AccountTypeDuplicate'] = processed_df['AccountType']
         processed_df['Nature of Transaction'] = "Brokerage Statement"
@@ -14495,9 +14508,9 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
         processed_df['RepDate'] = datetime.today().strftime('%d-%b-%y')
         processed_df['NPT2'] = clean_subject(subject)
         processed_df['Debtor Branch Ref'] = ''
-        # Ensure 'ASP Practice' retains its mapped values
+        # Ensure 'ASP Practice' retains its mapped values and is treated as string
         if 'ASP Practice' in processed_df.columns:
-            processed_df['ASP Practice'] = processed_df['ASP Practice']
+            processed_df['ASP Practice'] = processed_df['ASP Practice'].astype(str).str.strip()
         else:
             processed_df['ASP Practice'] = ''
             print("'ASP Practice' column not found in processed_df after mapping. Filled with empty strings.")
@@ -14595,7 +14608,7 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
                     table_4['Amount']
                     .astype(str)
                     .str.replace(',', '', regex=False)
-                    .str.replace('(', '', regex=False)
+                    .str.replace('(', '-', regex=False)  # Assuming '(' indicates negative
                     .str.replace(')', '', regex=False)
                 )
                 amount_values_numeric = pd.to_numeric(
@@ -14688,14 +14701,15 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
             net_amount_value_formatted = "{:,.2f}".format(net_amount_value)
             print(f"Net amount from 'table_3' is {net_amount_value}")
 
-
             # Check if sum_brokerage is approximately equal to net_amount_value
-            brokerage_equals_net_amount = np.isclose(sum_brokerage, net_amount_value, atol=0.01)
-            print(f"Does sum of 'Brokerage' equal net amount from 'table_3'? {brokerage_equals_net_amount}")
+            brokerage_equals_net_amount = np.isclose(sum_brokerage, net_value, atol=0.01)
+            print(f"Does sum of 'Brokerage' equal net value from 'table_3'? {brokerage_equals_net_amount}")
 
             # Get details from 'table_4'
             amount_values_cleaned = table_4['Amount'].astype(str).str.replace(',', '').str.replace('(', '-').str.replace(')', '')
-            amount_values_numeric = pd.to_numeric(amount_values_cleaned, errors='coerce').fillna(0)
+            amount_values_numeric = pd.to_numeric(
+                amount_values_cleaned, errors='coerce'
+            ).fillna(0)
             amount_total = amount_values_numeric.sum()
             narration_value_original = "{:,.2f}".format(amount_total)
             print(f"Total amount from 'table_4' is {amount_total}")
@@ -14728,12 +14742,15 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
                 debtor_branch_ref = ''
                 print(f"No 'Debtor Branch Ref' found for insurer '{insurer_name}', setting to empty.")
             processed_df['Debtor Branch Ref'] = debtor_branch_ref
-            processed_df['Service Tax Ledger'] = processed_df['Debtor Branch Ref'].str.replace('CUST_NEFT_', '')
+            processed_df['Service Tax Ledger'] = processed_df['Debtor Branch Ref'].str.replace('CUST_NEFT_', '', regex=False)
             processed_df['Debtor Name'] = insurer_name
             print("Updated 'Debtor Branch Ref', 'Service Tax Ledger', 'Debtor Name' in processed data.")
 
             # Convert date to dd/mm/yyyy format
-            date_col_formatted = pd.to_datetime(date_col).strftime('%d/%m/%Y')
+            try:
+                date_col_formatted = pd.to_datetime(date_col).strftime('%d/%m/%Y')
+            except:
+                date_col_formatted = ''
             print(f"Formatted date: {date_col_formatted}")
 
             # Get 'supplier_name_col' from 'table_4'
@@ -14742,7 +14759,7 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
                 if col in table_4.columns and not table_4[col].empty:
                     supplier_name_col = table_4[col].iloc[0]
                     break
-            print(f"Supplier name from 'table_4': {supplier_name_col}")
+            print(f"Supplier name from 'table_4': '{supplier_name_col}'")
 
             # Create narration considering GST and value in brackets
             narration_value_numeric = float(narration_value_original.replace(',', ''))
@@ -14763,8 +14780,6 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
                     narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} without GST 18%"
             processed_df['Narration'] = narration
             print(f"Narration set in processed data: {narration}")
-
-
 
             # Set 'Narration' in df_section
             df_section['Narration'] = narration
@@ -14874,6 +14889,7 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
                     'P & L JV': [invoice_nos, invoice_nos],
                     'NPT2': [df_section['NPT2'].iloc[-1]] * 2,
                 })
+                print("Created additional rows for GST.")
             else:
                 # Create additional row
                 new_rows = pd.DataFrame({
@@ -14905,6 +14921,8 @@ def process_future_generalli_life_insurance(file_path, template_data, risk_code_
                     'P & L JV': [invoice_nos],
                     'NPT2': [df_section['NPT2'].iloc[-1]],
                 })
+                print("Created additional row without GST.")
+
             print("Created additional rows.")
 
             # Ensure numeric columns are formatted properly
