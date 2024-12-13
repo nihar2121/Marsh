@@ -1020,7 +1020,7 @@ def select_insurer():
                 'Premium': 'Premium',
                 'Commisison': 'Brokerage'
                                                       }
-        elif selected_insurer == 'SBI Life Insurance Company Limited':
+        elif selected_insurer == 'Sbi Life Insurance Co. Ltd':
 
             read_tables_from_email(email_body, selected_insurer)  # Pass the selected insurer to the function
             default_mappings = {
@@ -1394,7 +1394,7 @@ def edit_mappings():
         'Future Generali India Life Insurance Co Ltd':0,
         'Star Union Dai-Ichi Life Insurance Company Ltd':0,
         'IFFCO TOKIO General Insurance Co. Ltd.':0,
-        'SBI Life Insurance Company Limited':0,
+        'Sbi Life Insurance Co. Ltd':0,
         'Max Life Insurance Co. Ltd. ( Prev. Known As Max New York Life Insurance Co. Ltd':0,
         'Aditya Birla Sun Life Insurance Company Limited':0,
         'Pramerica Life Insurance Limited':0,
@@ -1590,7 +1590,7 @@ def read_tables_from_email(email_body, selected_insurer):
         'Aviva Life Insurance Co. India Pvt. Ltd.','National Insurance Company Limited','ICICI Lombard General Insurance Co. Ltd.', 'Star Health Insurance', 'Hdfc Life Insurance Co. Ltd.',
         'Kotak Mahindra Life Insurance Company Limited(Previously Know As Kotak Mahindra','IndiaFirst Life Insurance Company Ltd','Shriram General Insurance Company Limited', 'Kotak Mahindra General Insurance Company',
         'Shriram Life Insurance Company Limited','Edelweiss Tokio Life Insurance Company Limited','Universal Sampo Insurance', 'Zuno General Insurance Limited', 'ICICI Prudential Life Insurance Co Ltd','Niva Bupa Health Insurance Company Limited (Previously Known As Max Bupa Health',
-        'Aegon Life Insurance Company Private Limited','Go Digit Life Insurance Limited','Pnb Metlife India Insurance Company Ltd (Pre. Met Life India Insurance Company P','Pramerica Life Insurance Limited','Max Life Insurance Co. Ltd. ( Prev. Known As Max New York Life Insurance Co. Ltd','Aditya Birla Sun Life Insurance Company Limited','SBI Life Insurance Company Limited','IFFCO TOKIO General Insurance Co. Ltd.','Star Union Dai-Ichi Life Insurance Company Ltd','Future Generali India Life Insurance Co Ltd','Aditya Birla Health Insurance Co.Ltd.','Manipal Cigna Health Insurance Company Limited (Prev. Cigna Ttk Health Insurance','Future Generali India Insurance Company Limited','Magma Hdi General Insurance Company Limited','Care Health Insurance Limited','Bajaj Allianz Life Insurance Company Limited','Reliance General Insurance Co. Ltd.','Hdfc Ergo General Insurance Company Limited','Bajaj Allianz General Insurance Co. Ltd.','Tata AIG General Insurance Co. Ltd.','Royal Sundaram General Insurance Co Ltd','Raheja Qbe General Insurance Company Limited','GoDigit General Insurance Limited','Acko General Insurance Limited','SBI General Insurance Company Limited','Cholamandalam General Insurance Co. Ltd.', 'Tata AIA Insurance','Liberty Videocon General Insurance Co. Ltd'
+        'Aegon Life Insurance Company Private Limited','Go Digit Life Insurance Limited','Pnb Metlife India Insurance Company Ltd (Pre. Met Life India Insurance Company P','Pramerica Life Insurance Limited','Max Life Insurance Co. Ltd. ( Prev. Known As Max New York Life Insurance Co. Ltd','Aditya Birla Sun Life Insurance Company Limited','Sbi Life Insurance Co. Ltd','IFFCO TOKIO General Insurance Co. Ltd.','Star Union Dai-Ichi Life Insurance Company Ltd','Future Generali India Life Insurance Co Ltd','Aditya Birla Health Insurance Co.Ltd.','Manipal Cigna Health Insurance Company Limited (Prev. Cigna Ttk Health Insurance','Future Generali India Insurance Company Limited','Magma Hdi General Insurance Company Limited','Care Health Insurance Limited','Bajaj Allianz Life Insurance Company Limited','Reliance General Insurance Co. Ltd.','Hdfc Ergo General Insurance Company Limited','Bajaj Allianz General Insurance Co. Ltd.','Tata AIG General Insurance Co. Ltd.','Royal Sundaram General Insurance Co Ltd','Raheja Qbe General Insurance Company Limited','GoDigit General Insurance Limited','Acko General Insurance Limited','SBI General Insurance Company Limited','Cholamandalam General Insurance Co. Ltd.', 'Tata AIA Insurance','Liberty Videocon General Insurance Co. Ltd'
     ]
 
     if selected_insurer not in supported_insurers:
