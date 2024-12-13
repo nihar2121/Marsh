@@ -71,39 +71,37 @@ def process_new_india_assurance(file, template_data, risk_code_data, cust_neft_d
         elif file_extension == '.txt':
             data = pd.read_csv(file, delimiter='\t', header=14)
 
-        # Select only alternating rows (starting from the second row after the header line)
+        # Select only alternating rows
         data = data.iloc[1::2]
 
-        # Drop fully blank rows to ensure no empty trailing lines remain
+        # Drop fully blank rows
         data.dropna(how='all', inplace=True)
 
-        # Remove rows that have fewer than 5 non-NA cells
+        # Remove rows with fewer than 5 non-NA cells
         data = data[data.apply(lambda row: row.count() > 4, axis=1)].reset_index(drop=True)
 
-        # Clean column names
+        # Clean column names and data
         data.columns = data.columns.str.strip()
-        # Clean string cells
         data = data.applymap(lambda x: x.strip() if isinstance(x, str) else x)
 
-        # Ensure 'Invoice Number' column is a string and stripped
+        # Clean 'Invoice Number'
         if 'Invoice Number' in data.columns:
             data['Invoice Number'] = data['Invoice Number'].astype(str).str.strip()
-            # Find 'Grand Total' rows and truncate data before that
+            # Truncate at 'Grand Total'
             stop_index = data[data['Invoice Number'].str.lower().str.contains('grand total', na=False)].index
             if not stop_index.empty:
                 data = data.loc[:stop_index[0] - 1]
 
-        # After truncating, drop any fully blank rows again
+        # Drop blank rows again after truncation
         data = data.dropna(how='all').reset_index(drop=True)
-        data.columns = data.columns.str.strip()
         data = data.applymap(lambda x: x.strip() if isinstance(x, str) else x)
 
-        # Map columns dynamically
+        # Map columns
         for left_col, right_col in column_mapping.items():
             if left_col in data.columns and right_col in template_data.columns:
                 template_data[right_col] = data[left_col]
 
-        # Set 'Customer Name' and 'Account Type'
+        # Set fixed columns
         template_data['Customer Name'] = "The New India Assurance Co. Ltd."
         template_data['Account Type'] = "Customer"
         template_data.rename(columns={
@@ -112,7 +110,6 @@ def process_new_india_assurance(file, template_data, risk_code_data, cust_neft_d
             'Account Type Duplicate': 'AccountTypeDuplicate'
         }, inplace=True)
 
-        # Add Nature of Transaction column
         template_data['Nature of Transaction'] = "Brokerage Statement"
 
         # Clean Policy No. and Endorsement No.
@@ -120,7 +117,7 @@ def process_new_india_assurance(file, template_data, risk_code_data, cust_neft_d
             if col in template_data.columns:
                 template_data[col] = template_data[col].astype(str).str.replace(':', '', regex=False).str.strip()
 
-        # Convert date columns
+        # Convert dates
         date_columns = ['Policy Start Date', 'Policy End Date']
         for column in date_columns:
             if column in template_data.columns:
@@ -131,10 +128,13 @@ def process_new_india_assurance(file, template_data, risk_code_data, cust_neft_d
         numeric_columns = ['Premium', 'Brokerage Rate', 'Brokerage']
         for column in numeric_columns:
             if column in template_data.columns:
-                template_data[column] = template_data[column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
+                template_data[column] = (template_data[column].astype(str)
+                                         .str.replace(',', '')
+                                         .str.replace('(', '')
+                                         .str.replace(')', ''))
                 template_data[column] = pd.to_numeric(template_data[column], errors='coerce').fillna(0)
 
-        # Calculate Brokerage Rate if possible
+        # Calculate Brokerage Rate
         if 'Premium' in template_data.columns and 'Brokerage' in template_data.columns:
             template_data['Brokerage Rate'] = template_data.apply(
                 lambda row: (row['Brokerage'] / row['Premium'] * 100) if row['Premium'] != 0 else 0,
@@ -166,7 +166,7 @@ def process_new_india_assurance(file, template_data, risk_code_data, cust_neft_d
 
         template_data['TDS Ledger'] = template_data['Debtor Name']
 
-        # Create Narration from tables 4 and 5
+        # Create Narration
         if not table_4.empty and not table_5.empty:
             date_col = table_4['Date'].iloc[0]
             amount_col = table_4['Amount'].iloc[0]
@@ -178,13 +178,13 @@ def process_new_india_assurance(file, template_data, risk_code_data, cust_neft_d
             template_data['Narration'] = narration
             template_data['Bank Ledger'] = table_4['Bank'].iloc[0]
             template_data['RepDate'] = datetime.today().strftime('%d-%b-%y')
-            template_data['NPT'] = '' 
+            template_data['NPT'] = ''
             template_data['NPT 2'] = subject
 
         if 'NPT 2' in template_data.columns:
             template_data['NPT 2'] = template_data['NPT 2'].apply(lambda x: x.replace('FW:', '').replace('RE:', '').strip() if isinstance(x, str) else x)
 
-        # Bank ledger lookup
+        # Bank ledger replacements
         bank_ledger_lookup = {
             'CITI_005_2600004': 'CITIBANK 340214005 ACCOUNT',
             'HSBC_001_2600014': 'HSBC A/C-030-618375-001',
@@ -193,9 +193,9 @@ def process_new_india_assurance(file, template_data, risk_code_data, cust_neft_d
 
         if 'Bank Ledger' in template_data.columns:
             for key, value in bank_ledger_lookup.items():
-                template_data['Bank Ledger'] = template_data['Bank Ledger'].replace(key,value)
+                template_data['Bank Ledger'] = template_data['Bank Ledger'].replace(key, value)
 
-        # Set P & L JV using Invoice No from table_5
+        # Set P & L JV
         invoice_no = table_5['Invoice No'].iloc[0]
         template_data['P & L JV'] = template_data.apply(
             lambda row: 'Endorsement' if pd.notna(row['Endorsement No.']) and str(row['Endorsement No.']).strip() else '',
@@ -211,8 +211,17 @@ def process_new_india_assurance(file, template_data, risk_code_data, cust_neft_d
         else:
             template_data['AccountTypeDuplicate'] = template_data['AccountType']
 
-        # **Remove rows with 'Total' in 'Policy No.' or null 'Policy No.' BEFORE calculations**
-        template_data = template_data[~template_data['Policy No.'].str.contains('Total', na=False)]
+        # Convert Policy No. to string and strip again
+        template_data['Policy No.'] = template_data['Policy No.'].astype(str).str.strip()
+
+        # Remove rows with "Total" in Policy No.
+        template_data = template_data[~template_data['Policy No.'].str.contains('total', case=False, na=False)]
+
+        # Remove rows where Policy No. is 'nan' or empty string
+        template_data = template_data[template_data['Policy No.'].str.lower() != 'nan']
+        template_data = template_data[template_data['Policy No.'] != '']
+
+        # Remove rows where Policy No. is null (just in case)
         template_data = template_data[~template_data['Policy No.'].isnull()]
 
         # Now do the GST/TDS calculations and add new rows
