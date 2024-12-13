@@ -74,10 +74,10 @@ def process_new_india_assurance(file, template_data, risk_code_data, cust_neft_d
         # Select only alternating rows (starting from the second row after the header line)
         data = data.iloc[1::2]
 
-        # Drop fully blank rows to ensure no empty trailing lines interfere
+        # Drop fully blank rows to ensure no empty trailing lines remain
         data.dropna(how='all', inplace=True)
 
-        # Remove rows that have fewer than 5 non-NA cells, as they are likely blank or not data rows
+        # Remove rows that have fewer than 5 non-NA cells
         data = data[data.apply(lambda row: row.count() > 4, axis=1)].reset_index(drop=True)
 
         # Clean column names
@@ -88,13 +88,12 @@ def process_new_india_assurance(file, template_data, risk_code_data, cust_neft_d
         # Ensure 'Invoice Number' column is a string and stripped
         if 'Invoice Number' in data.columns:
             data['Invoice Number'] = data['Invoice Number'].astype(str).str.strip()
-
             # Find 'Grand Total' rows and truncate data before that
             stop_index = data[data['Invoice Number'].str.lower().str.contains('grand total', na=False)].index
             if not stop_index.empty:
                 data = data.loc[:stop_index[0] - 1]
 
-        # After truncating, drop any fully blank rows again, just in case
+        # After truncating, drop any fully blank rows again
         data = data.dropna(how='all').reset_index(drop=True)
         data.columns = data.columns.str.strip()
         data = data.applymap(lambda x: x.strip() if isinstance(x, str) else x)
@@ -212,11 +211,11 @@ def process_new_india_assurance(file, template_data, risk_code_data, cust_neft_d
         else:
             template_data['AccountTypeDuplicate'] = template_data['AccountType']
 
-        # Remove total or empty policy rows
+        # **Remove rows with 'Total' in 'Policy No.' or null 'Policy No.' BEFORE calculations**
         template_data = template_data[~template_data['Policy No.'].str.contains('Total', na=False)]
         template_data = template_data[~template_data['Policy No.'].isnull()]
 
-        # Calculate amounts for new rows
+        # Now do the GST/TDS calculations and add new rows
         gst_tds_2_percent = float(table_3['GST TDS @2%'].iloc[0].replace(',', ''))
         narration_value = float(str(amount_col).replace(',', ''))
         sum_brokerage = template_data['Brokerage'].astype(float).sum()
