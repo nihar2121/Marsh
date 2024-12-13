@@ -1054,7 +1054,7 @@ def select_insurer():
             default_mappings = {
                 'Plan': 'Risk',
                 'Policy No.': 'Policy No.',
-                'Client ID': 'Client Name',
+                'Client name': 'Client Name',
                 'BSLI GST "TO" State':'Branch',
                 'EDC To': 'Policy End Date',
                 'Policy Inception Dt': 'Policy Start Date',
