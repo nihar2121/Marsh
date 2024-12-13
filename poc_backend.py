@@ -781,7 +781,7 @@ def process_united_india_insurance(file_path, template_data, risk_code_data, cus
         # Clean column names and data: strip strings and ensure all entries are strings where necessary
         data = data.applymap(lambda x: x.strip() if isinstance(x, str) else x)
 
-        # **Ensure all column names are strings**
+        # Ensure all column names are strings
         data.columns = [str(col).strip() for col in data.columns]
 
         # Initialize variables
@@ -831,7 +831,7 @@ def process_united_india_insurance(file_path, template_data, risk_code_data, cus
             # Remove any completely empty rows
             df = df.dropna(how='all').reset_index(drop=True)
 
-            # Clean column names and data: strip strings and ensure all entries are strings where necessary
+            # Clean column names and data
             df.columns = [str(col).strip() for col in df.columns]
             df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
 
@@ -885,52 +885,45 @@ def process_united_india_insurance(file_path, template_data, risk_code_data, cus
             processed_df['Policy Type'] = ''
             processed_df['Policy Start Date'] = ''
 
-            # Handle 'Policy No.' and 'Endorsement No.'
+            # Handle 'Policy No.' and 'Endorsement No.' without altering the original Policy No.
             if 'Policy No.' in processed_df.columns:
-                def split_policy_no(policy_no):
+                def get_endorsement_no(policy_no):
                     if pd.isnull(policy_no):
-                        return policy_no, ''
+                        return ''
                     parts = str(policy_no).split('/')
                     if len(parts) > 1:
                         endorsement_no = parts[-1]
                         if endorsement_no == '0':
                             endorsement_no = ''
-                        policy_no_main = '/'.join(parts[:-1])
-                    else:
-                        endorsement_no = ''
-                        policy_no_main = policy_no
-                    return policy_no_main, endorsement_no
+                        return endorsement_no
+                    return ''
 
-                policy_endorsement = processed_df['Policy No.'].apply(split_policy_no)
-                processed_df['Policy No.'], processed_df['Endorsement No.'] = zip(*policy_endorsement)
+                processed_df['Endorsement No.'] = processed_df['Policy No.'].apply(get_endorsement_no)
 
             # Clean numeric columns
             numeric_columns = ['Premium', 'Brokerage Rate', 'Brokerage']
             for column in numeric_columns:
                 if column in processed_df.columns:
-                    # Ensure all entries are strings before replacing characters
                     processed_df[column] = processed_df[column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
-                    # Convert to numeric, coercing errors to NaN, then fill NaN with 0
                     processed_df[column] = pd.to_numeric(processed_df[column], errors='coerce').fillna(0)
                 else:
-                    processed_df[column] = 0.00  # Ensure numeric zero value
+                    processed_df[column] = 0.00
 
-            # Calculate 'Brokerage Rate' as (Brokerage / Premium) * 100, rounded to 2 decimals
+            # Calculate 'Brokerage Rate'
             if 'Premium' in processed_df.columns and 'Brokerage' in processed_df.columns:
-                # Avoid division by zero
                 processed_df['Brokerage Rate'] = processed_df.apply(
                     lambda row: (float(row['Brokerage']) / float(row['Premium']) * 100) if float(row['Premium']) != 0 else 0,
                     axis=1
                 )
                 processed_df['Brokerage Rate'] = processed_df['Brokerage Rate'].round(2)
 
-            # Round numeric columns to 2 decimal places and format
+            # Round numeric columns
             for column in numeric_columns:
                 if column in processed_df.columns:
                     processed_df[column] = processed_df[column].round(2)
                     processed_df[column] = processed_df[column].apply(lambda x: "{0:.2f}".format(x))
 
-            # Handle 'Branch' column using 'OFFICE_NAME' from the attachment
+            # Handle 'Branch'
             if 'OFFICE_NAME' in df.columns:
                 processed_df['Branch'] = df['OFFICE_NAME']
             else:
@@ -938,12 +931,10 @@ def process_united_india_insurance(file_path, template_data, risk_code_data, cus
 
             # === Begin of Additional Processing ===
 
-            # The rest of the processing mirrors Oriental Insurance logic
-
             # Calculate sum of 'Brokerage'
             sum_brokerage = processed_df['Brokerage'].astype(float).sum()
 
-            # Get 'Amount', 'Bank', 'Date', 'Insurer Name', 'Narration' from table_4.csv
+            # Table_4 processing
             table_4['Amount_cleaned'] = table_4['Amount'].astype(str).str.replace(',', '').astype(float)
             table_4['Brokerage_Diff'] = abs(table_4['Amount_cleaned'] - sum_brokerage)
             amount_matching_row_index = table_4['Brokerage_Diff'].idxmin()
@@ -955,29 +946,26 @@ def process_united_india_insurance(file_path, template_data, risk_code_data, cus
             invoice_no = amount_matching_row['Invoice No']
             narration_from_table_4 = amount_matching_row['Narration'] if 'Narration' in amount_matching_row and pd.notnull(amount_matching_row['Narration']) else amount_matching_row.get('Narration (Ref)', '')
 
-            # Set 'NPT2' using 'Narration' from table_4
+            # Set 'NPT2'
             processed_df['NPT2'] = narration_from_table_4
 
             # Remove special characters from 'Narration' for file naming
             safe_narration = ''.join(e for e in str(narration_from_table_4) if e.isalnum() or e == ' ').strip()
 
-            # Get 'Debtor Branch Ref' from 'cust_neft_data' using 'Insurer Name' from table_4
+            # Get 'Debtor Branch Ref'
             debtor_branch_ref_row = cust_neft_data[cust_neft_data['Name'] == insurer_name]
             if not debtor_branch_ref_row.empty:
                 debtor_branch_ref = debtor_branch_ref_row['No.2'].iloc[0]
             else:
                 debtor_branch_ref = ''
 
-            # Set 'Debtor Branch Ref' in processed_df
             processed_df['Debtor Branch Ref'] = debtor_branch_ref
-
-            # 'Service Tax Ledger' is derived from 'Debtor Branch Ref'
             processed_df['Service Tax Ledger'] = processed_df['Debtor Branch Ref'].str.replace('CUST_NEFT_', '')
 
-            # Set 'Debtor Name' as 'Insurer Name'
+            # Set 'Debtor Name'
             processed_df['Debtor Name'] = insurer_name
 
-            # Get 'SupplierName' and 'SupplierState' from table_5.csv matching 'TotalTaxAmt' closest to sum_brokerage
+            # Table_5 processing
             table_5['TotalTaxAmt_cleaned'] = table_5['TotalTaxAmt'].astype(str).str.replace(',', '').astype(float)
             table_5['Brokerage_Diff'] = abs(table_5['TotalTaxAmt_cleaned'] - sum_brokerage)
             matching_row_index = table_5['Brokerage_Diff'].idxmin()
@@ -985,18 +973,14 @@ def process_united_india_insurance(file_path, template_data, risk_code_data, cus
             supplier_state = matching_row['SupplierState'] if 'SupplierState' in matching_row and pd.notnull(matching_row['SupplierState']) else matching_row.get('MarshState', '')
             supplier_name_col = matching_row['SupplierName']
 
-            # Read 'Chart of Account' file
+            # Read 'Chart of Account'
             chart_of_account_path = r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller\Common folder AP & AR\Brokerage Statement Automation\support files\Chart of Account.xlsx'
             if not os.path.exists(chart_of_account_path):
                 raise FileNotFoundError(f"Chart of Account file not found at path: {chart_of_account_path}")
             chart_of_account = pd.read_excel(chart_of_account_path)
 
-            # Ensure 'SupplierState' is string and clean it
             chart_of_account['SupplierState'] = chart_of_account['SupplierState'].astype(str).str.strip().str.lower()
             supplier_state = str(supplier_state).strip().lower()
-
-            # Convert columns to lowercase before mapping
-            # Get 'Name-AY 2025-26' and 'Gl No' based on 'SupplierState'
             chart_matching_rows = chart_of_account[chart_of_account['SupplierState'] == supplier_state]
             if not chart_matching_rows.empty:
                 name_ay_2025_26 = chart_matching_rows['Name-AY 2025-26'].iloc[0]
@@ -1005,8 +989,7 @@ def process_united_india_insurance(file_path, template_data, risk_code_data, cus
                 name_ay_2025_26 = ''
                 gl_no = ''
 
-            # Get 'GST TDS' from table_3.csv
-            # Check for 'TotalTaxAmt' or 'Total' column
+            # Table_3 processing
             if 'TotalTaxAmt' in table_3.columns:
                 total_tax_amt_col = 'TotalTaxAmt'
             elif 'Total' in table_3.columns:
@@ -1014,7 +997,6 @@ def process_united_india_insurance(file_path, template_data, risk_code_data, cus
             else:
                 raise ValueError("Neither 'TotalTaxAmt' nor 'Total' column found in table_3.csv")
 
-            # Check for 'GST TDS' or 'GST TDS @2%' column
             if 'GST TDS' in table_3.columns:
                 gst_tds_col = 'GST TDS'
             elif 'GST TDS @2%' in table_3.columns:
@@ -1022,32 +1004,24 @@ def process_united_india_insurance(file_path, template_data, risk_code_data, cus
             else:
                 raise ValueError("Neither 'GST TDS' nor 'GST TDS @2%' column found in table_3.csv")
 
-            # Clean and convert the columns to float
             table_3['TotalTaxAmt_cleaned'] = table_3[total_tax_amt_col].astype(str).str.replace(',', '').astype(float)
             table_3['GST TDS_cleaned'] = table_3[gst_tds_col].astype(str).str.replace(',', '').astype(float)
-
-            # Calculate the difference between 'TotalTaxAmt' and sum of brokerage
             table_3['Brokerage_Diff'] = abs(table_3['TotalTaxAmt_cleaned'] - sum_brokerage)
-
-            # Find the row with the minimum difference
             gst_tds_matching_row_index = table_3['Brokerage_Diff'].idxmin()
             gst_tds_matching_row = table_3.loc[gst_tds_matching_row_index]
-
-            # Get the 'GST TDS' value
             gst_tds_2_percent = gst_tds_matching_row['GST TDS_cleaned']
 
-            # Convert date to dd/mm/yyyy format
+            # Format date
             try:
                 date_col_formatted = pd.to_datetime(date_col).strftime('%d/%m/%Y')
             except Exception:
                 date_col_formatted = ''
 
-            # Check if 'GST' column exists in data
+            # Check if GST present
             gst_present = any(
                 ('GST' in str(col)) or ('GST @18%' in str(col)) for col in data.columns
             )
 
-            # Create narration using original amount and no space between 'Rs.' and amount
             if gst_present:
                 narration = (
                     f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} with GST"
@@ -1057,10 +1031,9 @@ def process_united_india_insurance(file_path, template_data, risk_code_data, cus
                     f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} without GST 18%"
                 )
 
-            # Set 'Narration' in processed_df
             processed_df['Narration'] = narration
 
-            # Map 'Bank Ledger' as in Oriental Insurance
+            # Map 'Bank Ledger'
             bank_ledger_lookup = {
                 'CITI_005_2600004': 'CITIBANK 340214005 ACCOUNT',
                 'HSBC_001_2600014': 'HSBC A/C-030-618375-001',
@@ -1073,24 +1046,17 @@ def process_united_india_insurance(file_path, template_data, risk_code_data, cus
                     break
             processed_df['Bank Ledger'] = bank_ledger_value
 
-            # Set 'TDS Ledger' as 'Debtor Name' (which is 'Insurer Name')
             processed_df['TDS Ledger'] = processed_df['Debtor Name']
-
-            # Set 'P & L JV'
             processed_df['P & L JV'] = processed_df['Endorsement No.'].apply(lambda x: 'Endorsement' if pd.notna(x) and str(x).strip() else '')
 
-            # For 'Branch', use 'OFFICE_NAME' from attachment, get 'SupplierState', and map using 'branch_lookups.xlsx'
+            # Branch lookups
             branch_lookups_path = r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller\Common folder AP & AR\Brokerage Statement Automation\support files\state_lookups.xlsx'
             if not os.path.exists(branch_lookups_path):
                 raise FileNotFoundError(f"Branch lookups file not found at path: {branch_lookups_path}")
             branch_lookups = pd.read_excel(branch_lookups_path)
-
-            # Ensure 'state' and 'shortform' are strings and clean them
             branch_lookups['state'] = branch_lookups['state'].astype(str).str.strip().str.lower()
             branch_lookups['shortform'] = branch_lookups['shortform'].astype(str).str.strip()
             supplier_state = str(supplier_state).strip().lower()
-
-            # Map 'Branch' using 'SupplierState'
             branch_match = branch_lookups[branch_lookups['state'] == supplier_state]
             if not branch_match.empty:
                 branch_value = branch_match['shortform'].iloc[0]
@@ -1098,16 +1064,14 @@ def process_united_india_insurance(file_path, template_data, risk_code_data, cus
                 branch_value = ''
             processed_df['Branch'] = branch_value
 
-            # Calculate Brokerage values for the new rows
+            # Additional rows calculation
             gst_tds_18_percent = sum_brokerage * 0.18
             first_new_row_brokerage = gst_tds_18_percent
             second_new_row_brokerage = -gst_tds_2_percent
             total_brokerage_with_new_rows = sum_brokerage + first_new_row_brokerage + second_new_row_brokerage
-            # Convert 'narration_value_original' to float after removing commas
             narration_value_float = float(str(narration_value_original).replace(',', ''))
             third_new_row_brokerage = narration_value_float - total_brokerage_with_new_rows
 
-            # Create the three additional rows (same as Oriental Insurance)
             new_rows = pd.DataFrame({
                 'Entry No.': '',
                 'Debtor Name': processed_df['Debtor Name'].iloc[0],
@@ -1130,8 +1094,8 @@ def process_united_india_insurance(file_path, template_data, risk_code_data, cus
                 'AccountTypeDuplicate': [processed_df['AccountTypeDuplicate'].iloc[0], 'G/L Account', 'G/L Account'],
                 'Service Tax Ledger': [
                     processed_df['Service Tax Ledger'].iloc[0],
-                    gl_no,  # For second new row, use 'Gl No' from 'Chart of Account'
-                    '2300022'  # Third new row remains '2300022'
+                    gl_no,
+                    '2300022'
                 ],
                 'TDS Ledger': [processed_df['TDS Ledger'].iloc[0], name_ay_2025_26, 'TDS Receivable - AY 2025-26'],
                 'RepDate': processed_df['RepDate'].iloc[-1],
@@ -1142,7 +1106,6 @@ def process_united_india_insurance(file_path, template_data, risk_code_data, cus
                 'NPT2': processed_df['NPT2'].iloc[-1]
             })
 
-            # Ensure all required columns are present in new_rows
             required_new_columns = [
                 'Entry No.', 'Debtor Name', 'Nature of Transaction', 'AccountType', 'Debtor Branch Ref',
                 'Client Name', 'Policy No.', 'Risk', 'Endorsement No.', 'Policy Type', 'Policy Start Date',
@@ -1154,20 +1117,19 @@ def process_united_india_insurance(file_path, template_data, risk_code_data, cus
                 if col not in new_rows.columns:
                     new_rows[col] = ''
 
-            # Ensure numeric columns are formatted properly
             for column in numeric_columns:
                 if column in new_rows.columns:
                     new_rows[column] = pd.to_numeric(new_rows[column], errors='coerce').fillna(0)
                     new_rows[column] = new_rows[column].round(2)
                     new_rows[column] = new_rows[column].apply(lambda x: "{0:.2f}".format(x))
 
-            # Concatenate new_rows to processed_df
+            # Concatenate new_rows
             processed_df = pd.concat([processed_df, new_rows], ignore_index=True)
 
             # Update 'Entry No.'
             processed_df['Entry No.'] = range(1, len(processed_df) + 1)
 
-            # Rearranging columns to desired order
+            # Rearranging columns
             desired_columns = [
                 'Entry No.', 'Debtor Name', 'Nature of Transaction', 'AccountType', 'Debtor Branch Ref',
                 'Client Name', 'Policy No.', 'Risk', 'Endorsement No.', 'Policy Type', 'Policy Start Date',
@@ -1175,30 +1137,23 @@ def process_united_india_insurance(file_path, template_data, risk_code_data, cus
                 'AccountTypeDuplicate', 'Service Tax Ledger', 'TDS Ledger', 'RepDate', 'Branch',
                 'Income category', 'ASP Practice', 'P & L JV', 'NPT2'
             ]
-
-            # Ensure all desired columns are present
             for col in desired_columns:
                 if col not in processed_df.columns:
                     processed_df[col] = ''
             processed_df = processed_df[desired_columns]
 
-            # === End of Additional Processing ===
-
-            # Remove empty rows in processed_df except for 'Entry No.'
+            # Remove empty rows except Entry No.
             processed_df = processed_df.dropna(how='all', subset=processed_df.columns.difference(['Entry No.'])).reset_index(drop=True)
-
-            # Update 'Entry No.' after removing empty rows
             processed_df['Entry No.'] = range(1, len(processed_df) + 1)
 
-            # Append to processed_dataframes list
             processed_dataframes.append(processed_df)
 
-            # Generate the shortened subject and date for the filename
-            short_subject = subject[:50].strip().replace(' ', '_').replace('.', '').replace(':', '')  # Shorten to 50 characters
-            short_narration = safe_narration[:50].strip().replace(' ', '_')  # Shorten to 50 characters
-            date_str = datetime.now().strftime("%Y%m%d")  # Date only
+            # Generate filenames
+            short_subject = subject[:50].strip().replace(' ', '_').replace('.', '').replace(':', '')
+            short_narration = safe_narration[:50].strip().replace(' ', '_')
+            date_str = datetime.now().strftime("%Y%m%d")
 
-            # Define output directories for United India Insurance
+            # Define output directories
             base_dir = r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller\Common folder AP & AR\Brokerage Statement Automation\United India Insurance Template Files'
             excel_dir = os.path.join(base_dir, 'excel_file')
             csv_dir = os.path.join(base_dir, 'csv_file')
@@ -1207,7 +1162,7 @@ def process_united_india_insurance(file_path, template_data, risk_code_data, cus
             os.makedirs(excel_dir, exist_ok=True)
             os.makedirs(csv_dir, exist_ok=True)
 
-            # Save each processed dataframe
+            # Save processed data
             excel_file_name = f'{short_narration}_section_{idx+1}_{date_str}.xlsx'
             csv_file_name = f'{short_narration}_section_{idx+1}_{date_str}.csv'
             excel_file_path = os.path.join(excel_dir, excel_file_name)
@@ -1217,7 +1172,6 @@ def process_united_india_insurance(file_path, template_data, risk_code_data, cus
             print(f"Saved Excel file: {excel_file_path}")
             print(f"Saved CSV file: {csv_file_path}")
 
-            # Collect the file paths
             excel_file_paths.append(excel_file_path)
 
         # Return the first processed dataframe and the path to the first Excel file
@@ -1229,6 +1183,7 @@ def process_united_india_insurance(file_path, template_data, risk_code_data, cus
     except Exception as e:
         print(f"Error processing United India Insurance data: {str(e)}", file=sys.stderr)
         raise
+
 
 def process_tata_aia_insurance(file_path, template_data, risk_code_data, cust_neft_data, table_3, table_4, table_5, subject, mappings):
     try:
