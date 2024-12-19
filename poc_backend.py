@@ -8693,6 +8693,23 @@ def process_tata_aig_insurance(file_path, template_data, risk_code_data, cust_ne
         print(f"Error processing Tata AIG general insurance: {str(e)}")
         raise
 
+import os
+import pandas as pd
+import numpy as np
+from datetime import datetime
+
+def parse_date_flexible(date_str):
+    """
+    Parses a date string into a datetime object.
+    Supports multiple date formats.
+    """
+    for fmt in ('%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d'):
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+    return None  # Return None if no format matches
+
 def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cust_neft_data,
                                     table_3, table_4, table_5, subject, mappings):
     try:
@@ -8758,8 +8775,6 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
                 section_df.columns = columns
                 sections.append(section_df)
             print(f"Found {len(sections)} sections based on repeating headers.")
-
-        # ---- Updated Splitting Logic Ends Here ----
 
         processed_sections = []
         for idx, section in enumerate(sections):
@@ -8861,16 +8876,85 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
                 processed_df['P & L JV'] = ''
                 print("Initialized 'P & L JV' column as it was missing.")
 
-            # Initialize 'Income category' after 'P & L JV' is ensured
-            processed_df['Income category'] = processed_df['P & L JV']
-            print("'Income category' column set from 'P & L JV'.")
+            # Map 'P & L JV' from mappings first
+            if 'P & L JV' in mapped_df.columns:
+                print("Mapping 'P & L JV' from mappings.")
+                processed_df['P & L JV'] = mapped_df.get('P & L JV', '')
+                print("'P & L JV' after mapping:")
+                print(processed_df['P & L JV'].head(5))
+            else:
+                print("'P & L JV' not found in mapped DataFrame. Initializing with empty strings.")
+                processed_df['P & L JV'] = ''
+
+            # Apply additional mapping from 'state_lookups.xlsx' Sheet3
+            if 'P & L JV' in processed_df.columns:
+                print("Applying additional mapping to 'P & L JV' from 'state_lookups.xlsx' Sheet3.")
+                endorsement_type_mapping = pd.read_excel(
+                    r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
+                    r'\Common folder AP & AR\Brokerage Statement Automation\support files'
+                    r'\state_lookups.xlsx',
+                    sheet_name='Sheet3',
+                )
+                endorsement_type_mapping['Endorsement Type'] = (
+                    endorsement_type_mapping['Endorsement Type']
+                    .astype(str)
+                    .str.strip()
+                    .str.lower()
+                )
+                endorsement_type_mapping['lookup value'] = (
+                    endorsement_type_mapping['lookup value']
+                    .astype(str)
+                    .str.strip()
+                )
+                processed_df['P & L JV'] = (
+                    processed_df['P & L JV'].astype(str).str.strip().str.lower()
+                )
+                endorsement_lookup = (
+                    endorsement_type_mapping.set_index('Endorsement Type')['lookup value']
+                    .to_dict()
+                )
+                processed_df['P & L JV'] = processed_df['P & L JV'].map(
+                    endorsement_lookup
+                ).fillna('')
+                print("'P & L JV' after additional mapping:")
+                print(processed_df['P & L JV'].head(5))
+            else:
+                processed_df['P & L JV'] = ''
+                print("'P & L JV' column not found during additional mapping. Initialized as empty.")
+
+            # Derive 'P & L JV' based on 'Policy No.' if it's blank
+            if 'Policy No.' in processed_df.columns:
+                print("Checking 'Policy No.' for endorsements to set 'P & L JV'.")
+                def set_pl_jv(row):
+                    if pd.isna(row['P & L JV']) or row['P & L JV'].strip() == '':
+                        policy_no = str(row['Policy No.']).strip()
+                        if policy_no.endswith('-E') or ('-E' in policy_no and policy_no.split('-E')[-1].isdigit()):
+                            row['P & L JV'] = 'Endorsement'
+                            print(f"Set 'P & L JV' to 'Endorsement' for Policy No.: {policy_no}")
+                    return row
+                processed_df = processed_df.apply(set_pl_jv, axis=1)
+                print("'P & L JV' after deriving from 'Policy No.':")
+                print(processed_df['P & L JV'].head(5))
+            else:
+                print("'Policy No.' column not found. Skipping 'P & L JV' derivation.")
+
+            # Convert 'Risk' to integer
+            if 'Risk' in processed_df.columns:
+                print("Converting 'Risk' column to integer.")
+                processed_df['Risk'] = pd.to_numeric(processed_df['Risk'], errors='coerce').astype('Int64')
+                print("'Risk' column after conversion:")
+                print(processed_df['Risk'].head(5))
+            else:
+                print("'Risk' column not found in processed DataFrame.")
 
             # ---- New Logic Starts Here ----
-            # If the 'Risk' column has only numbers
+            # If the 'Risk' column has only numbers, ensure it's int and perform risk code mapping
             if 'Risk' in processed_df.columns:
-                print("Processing 'Risk' column.")
-                if processed_df['Risk'].apply(lambda x: str(x).strip().isdigit()).all():
-                    print("'Risk' column contains only numbers. Proceeding with risk code mapping.")
+                print("Processing 'Risk' column for risk code mapping.")
+                if processed_df['Risk'].notna().all():
+                    print("'Risk' column contains only valid numbers. Proceeding with risk code mapping.")
+                    # Ensure 'Risk' is integer
+                    processed_df['Risk'] = processed_df['Risk'].astype(int)
                     # Open 'Risk code.xlsx' from support files folder, open 'Sheet1'
                     risk_code_path = (
                         r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
@@ -8896,10 +8980,9 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
                     processed_df = processed_df.drop(columns=['PRODUCT_4DIGIT_CODE', 'PRODUCT_NAME'])
                     print("Risk code mapping applied successfully.")
                 else:
-                    print("'Risk' column does not contain only numbers. Skipping risk code mapping.")
+                    print("'Risk' column contains non-numeric values. Skipping risk code mapping.")
             else:
                 print("'Risk' column not found in processed DataFrame.")
-
             # ---- New Logic Ends Here ----
 
             # Handle dates in 'Policy Start Date' and 'Policy End Date' columns after mappings
@@ -8932,37 +9015,6 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
                 print("'Brokerage Rate' calculated successfully.")
             else:
                 print("'Premium' or 'Brokerage' column not found. Skipping 'Brokerage Rate' calculation.")
-
-            # Ensure 'Endorsement No.' is derived from 'Policy No.' if blank
-            if 'Endorsement No.' in processed_df.columns and 'Policy No.' in processed_df.columns:
-                print("Deriving 'Endorsement No.' from 'Policy No.' where necessary.")
-                def derive_endorsement(row):
-                    if not row['Endorsement No.']:
-                        policy_no = str(row['Policy No.']).strip()
-                        if '-' in policy_no:
-                            parts = policy_no.split('-')
-                            last_part = parts[-1]
-                            if last_part.startswith('E'):
-                                row['Endorsement No.'] = last_part
-                                row['P & L JV'] = 'Endorsement'
-                            else:
-                                row['Endorsement No.'] = ''
-                                row['P & L JV'] = ''
-                        else:
-                            row['Endorsement No.'] = ''
-                            row['P & L JV'] = ''
-                    return row
-                processed_df = processed_df.apply(derive_endorsement, axis=1)
-                print("'Endorsement No.' derived successfully where it was blank.")
-            else:
-                print("'Endorsement No.' or 'Policy No.' column not found in processed DataFrame.")
-
-            # Update 'Income category' again after 'P & L JV' is processed
-            if 'P & L JV' in processed_df.columns:
-                processed_df['Income category'] = processed_df['P & L JV']
-                print("'Income category' updated from 'P & L JV'.")
-            else:
-                print("'P & L JV' column not found after processing endorsements.")
 
             # Income category lookup
             if 'Income category' in processed_df.columns:
@@ -9194,7 +9246,7 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
                     'Client Name': ["GST @ 18%", "TDS Receivable - AY 2025-26"],
                     'Policy No.': '',
                     'Risk': '',
-                    'Endorsement No.': ["", ""],
+                    'Endorsement No.': ["", ""],  # Kept as is from mappings
                     'Policy Type': '',
                     'Policy Start Date': '',
                     'Policy End Date': '',
@@ -9229,7 +9281,7 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
                     'Client Name': ["TDS Receivable - AY 2025-26"],
                     'Policy No.': '',
                     'Risk': '',
-                    'Endorsement No.': [""],
+                    'Endorsement No.': [""],  # Kept as is from mappings
                     'Policy Type': '',
                     'Policy Start Date': '',
                     'Policy End Date': '',
