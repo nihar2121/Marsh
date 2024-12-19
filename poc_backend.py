@@ -8693,22 +8693,6 @@ def process_tata_aig_insurance(file_path, template_data, risk_code_data, cust_ne
         print(f"Error processing Tata AIG general insurance: {str(e)}")
         raise
 
-import os
-import pandas as pd
-import numpy as np
-from datetime import datetime
-
-def parse_date_flexible(date_str):
-    """
-    Parses a date string into a datetime object.
-    Supports multiple date formats.
-    """
-    for fmt in ('%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d'):
-        try:
-            return datetime.strptime(date_str, fmt)
-        except ValueError:
-            continue
-    return None  # Return None if no format matches
 
 def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cust_neft_data,
                                     table_3, table_4, table_5, subject, mappings):
@@ -8880,7 +8864,7 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
             if 'P & L JV' in mapped_df.columns:
                 print("Mapping 'P & L JV' from mappings.")
                 processed_df['P & L JV'] = mapped_df.get('P & L JV', '')
-                print("'P & L JV' after mapping:")
+                print("'P & L JV' after initial mapping:")
                 print(processed_df['P & L JV'].head(5))
             else:
                 print("'P & L JV' not found in mapped DataFrame. Initializing with empty strings.")
@@ -8928,6 +8912,7 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
                 def set_pl_jv(row):
                     if pd.isna(row['P & L JV']) or row['P & L JV'].strip() == '':
                         policy_no = str(row['Policy No.']).strip()
+                        # Check if 'Policy No.' ends with '-E' followed by digits (e.g., '-E2343')
                         if policy_no.endswith('-E') or ('-E' in policy_no and policy_no.split('-E')[-1].isdigit()):
                             row['P & L JV'] = 'Endorsement'
                             print(f"Set 'P & L JV' to 'Endorsement' for Policy No.: {policy_no}")
@@ -8947,7 +8932,7 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
             else:
                 print("'Risk' column not found in processed DataFrame.")
 
-            # ---- New Logic Starts Here ----
+            # ---- Risk Code Mapping Starts Here ----
             # If the 'Risk' column has only numbers, ensure it's int and perform risk code mapping
             if 'Risk' in processed_df.columns:
                 print("Processing 'Risk' column for risk code mapping.")
@@ -8964,7 +8949,7 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
                     print("Risk code data loaded successfully.")
                     # Clean column names
                     risk_code_df.columns = risk_code_df.columns.str.strip()
-                    # Ensure 'Risk' and 'PRODUCT_4DIGIT_CODE' are strings
+                    # Ensure 'PRODUCT_4DIGIT_CODE' and 'PRODUCT_NAME' are strings
                     processed_df['Risk'] = processed_df['Risk'].astype(str).str.strip()
                     risk_code_df['PRODUCT_4DIGIT_CODE'] = risk_code_df['PRODUCT_4DIGIT_CODE'].astype(str).str.strip()
                     # Merge
@@ -8983,7 +8968,7 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
                     print("'Risk' column contains non-numeric values. Skipping risk code mapping.")
             else:
                 print("'Risk' column not found in processed DataFrame.")
-            # ---- New Logic Ends Here ----
+            # ---- Risk Code Mapping Ends Here ----
 
             # Handle dates in 'Policy Start Date' and 'Policy End Date' columns after mappings
             date_columns = ['Policy Start Date', 'Policy End Date']
@@ -9385,7 +9370,6 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
     except Exception as e:
         print(f"Error processing Bajaj Allianz general insurance: {str(e)}")
         raise
-
 
 
 
