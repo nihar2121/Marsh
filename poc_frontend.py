@@ -818,7 +818,7 @@ def select_insurer():
                 'POLICY_REFERENCE': 'Policy No.',
                 'CUSTOMER NAME': 'Client Name',
                 '': 'Policy End Date',
-                'Policy Date': 'Policy Start Date',
+                'Polie': 'Policy Start Date',
                 'Branch': 'Branch',
                 'MOVEMENT': 'Income category',
                 'MOVEMENT': 'P & L JV',
