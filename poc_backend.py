@@ -8178,17 +8178,17 @@ def process_tata_aig_insurance(file_path, template_data, risk_code_data, cust_ne
         # Read the file based on its extension, including xlsb files
         file_extension = os.path.splitext(file_path)[1].lower()
         if file_extension == '.xlsx':
-            data = pd.read_excel(file_path, header=0)
+            data = pd.read_excel(file_path, header=0, dtype=str)
         elif file_extension == '.xlsb':
-            data = pd.read_excel(file_path, engine='pyxlsb', header=0)
+            data = pd.read_excel(file_path, engine='pyxlsb', header=0, dtype=str)
         elif file_extension == '.csv':
-            data = pd.read_csv(file_path, header=0)
+            data = pd.read_csv(file_path, header=0, dtype=str)
         elif file_extension == '.ods':
-            data = pd.read_excel(file_path, engine='odf', header=0)
+            data = pd.read_excel(file_path, engine='odf', header=0, dtype=str)
         elif file_extension == '.txt':
-            data = pd.read_csv(file_path, delimiter='\t', header=0)
+            data = pd.read_csv(file_path, delimiter='\t', header=0, dtype=str)
         elif file_extension == '.xls':
-            data = pd.read_excel(file_path, engine='xlrd', header=0)
+            data = pd.read_excel(file_path, engine='xlrd', header=0, dtype=str)
         else:
             raise ValueError("Unsupported file format")
 
@@ -8229,13 +8229,18 @@ def process_tata_aig_insurance(file_path, template_data, risk_code_data, cust_ne
             # Clean column names and data
             section.columns = section.columns.str.strip()
             section = section.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+
+            # Ensure 'Policy No' is treated as string to preserve leading zeros
+            if 'Policy No' in section.columns:
+                section['Policy No'] = section['Policy No'].astype(str).str.strip()
+
             # Process mappings from frontend (attachment columns on left, template columns on right)
             if mappings:
                 # Create a DataFrame to hold mapped data
                 mapped_df = pd.DataFrame()
                 for attachment_col, template_col in mappings.items():
                     if attachment_col in section.columns:
-                        mapped_df[template_col] = section[attachment_col]
+                        mapped_df[template_col] = section[attachment_col].astype(str).str.strip()
                     else:
                         mapped_df[template_col] = ''
             else:
@@ -8300,7 +8305,9 @@ def process_tata_aig_insurance(file_path, template_data, risk_code_data, cust_ne
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(
+                        lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else ''
+                    )
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
             # Calculate 'Brokerage Rate' as (Brokerage / Premium) * 100, rounded to 2 decimals
@@ -8350,9 +8357,6 @@ def process_tata_aig_insurance(file_path, template_data, risk_code_data, cust_ne
             else:
                 processed_df['P & L JV'] = ''
 
-            processed_df['P & L JV'] = processed_df.apply(
-                lambda row: '' if row['Endorsement No.'] == '' else 'Endorsement', axis=1
-            )
             # Branch lookup
             if 'Branch' in processed_df.columns:
                 state_lookups_sheet2 = pd.read_excel(
@@ -8377,6 +8381,36 @@ def process_tata_aig_insurance(file_path, template_data, risk_code_data, cust_ne
             else:
                 processed_df['Branch'] = ''
 
+            # Synchronize 'Income category' and 'P & L JV' columns
+            # Ensure both columns exist
+            if 'Income category' in processed_df.columns and 'P & L JV' in processed_df.columns:
+                # Both columns are present
+                # If 'Income category' is mapped and 'P & L JV' is blank, duplicate 'Income category' to 'P & L JV'
+                processed_df['P & L JV'] = np.where(
+                    (processed_df['Income category'].notna()) &
+                    (processed_df['Income category'] != '') &
+                    ((processed_df['P & L JV'].isna()) | (processed_df['P & L JV'] == '')),
+                    processed_df['Income category'],
+                    processed_df['P & L JV']
+                )
+                # If 'P & L JV' is mapped and 'Income category' is blank, duplicate 'P & L JV' to 'Income category'
+                processed_df['Income category'] = np.where(
+                    (processed_df['P & L JV'].notna()) &
+                    (processed_df['P & L JV'] != '') &
+                    ((processed_df['Income category'].isna()) | (processed_df['Income category'] == '')),
+                    processed_df['P & L JV'],
+                    processed_df['Income category']
+                )
+                # If both are mapped and neither is blank, do not alter
+            elif 'Income category' in processed_df.columns:
+                # Only 'Income category' exists, duplicate it to 'P & L JV'
+                processed_df['P & L JV'] = processed_df['Income category']
+            elif 'P & L JV' in processed_df.columns:
+                # Only 'P & L JV' exists, duplicate it to 'Income category'
+                processed_df['Income category'] = processed_df['P & L JV']
+
+            # Handle dates in 'Policy Start Date' and 'Policy End Date' columns after mappings
+            # (This section remains unchanged)
 
             if 'Endorsement No.' in processed_df.columns:
                 def process_endorsement(row):
@@ -8438,6 +8472,7 @@ def process_tata_aig_insurance(file_path, template_data, risk_code_data, cust_ne
             processed_df['RepDate'] = datetime.today().strftime('%d-%b-%y')
             processed_df['NPT2'] = subject.replace('FW:', '').replace('RE:', '').strip()
             processed_df['Debtor Branch Ref'] = ''
+            # Ensure 'ASP Practice' exists
             processed_df['ASP Practice'] = processed_df.get('ASP Practice', '')
             processed_df['NPT'] = ''
             processed_df['Bank Ledger'] = ''
@@ -8496,7 +8531,6 @@ def process_tata_aig_insurance(file_path, template_data, risk_code_data, cust_ne
             processed_df['Debtor Branch Ref'] = debtor_branch_ref
             processed_df['Service Tax Ledger'] = processed_df['Debtor Branch Ref'].str.replace('CUST_NEFT_', '')
             processed_df['Debtor Name'] = insurer_name
-
             # Convert date to dd/mm/yyyy format
             date_col_formatted = pd.to_datetime(date_col).strftime('%d/%m/%Y')
 
