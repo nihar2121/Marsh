@@ -864,12 +864,12 @@ def select_insurer():
                 'Business_Type': 'Income category',
                 'Endorsement_Type': 'P & L JV',
                 'Endorsement_Num': 'Endorsement No.',
-                '': 'Premium1',
-                '': 'Premium2',
-                '': 'Premium3',
-                '': 'Brokerage1',
-                '': 'Brokerage2',
-                '': 'Brokerage3'
+                'ewrer': 'Premium1',
+                'jfa': 'Premium2',
+                'nananan': 'Premium3',
+                'fdmms': 'Brokerage1',
+                'sdaaaa': 'Brokerage2',
+                'vbk': 'Brokerage3'
                                                       }
         elif selected_insurer == 'Reliance General Insurance Co. Ltd.':
 
@@ -1074,12 +1074,12 @@ def select_insurer():
                 'Geographical State': 'Branch',
                 'Type of Transaction': 'Income Category',
                 'Endorsement ind': 'Endorsement No.',
-                'Gross Premium': 'Premium1',
-                'Terrorism premium': 'Premium2',
-                'Tp premium': 'Premium3',
-                'Base Commission': 'Brokerage1',
-                'Comm/Brokerage Amount(OD)': 'Brokerage2',
-                'Comm/Brokerage Amount(TP/Terr)': 'Brokerage3'
+                'sf': 'Premium1',
+                's234': 'Premium2',
+                'sfawe': 'Premium3',
+                'cnmdf': 'Brokerage1',
+                'adsf': 'Brokerage2',
+                'dsfa': 'Brokerage3'
                                                       }                
         elif selected_insurer == 'Pramerica Life Insurance Limited':
 
@@ -1239,18 +1239,18 @@ def select_insurer():
 
             read_tables_from_email(email_body, selected_insurer)  # Pass the selected insurer to the function
             default_mappings = {
-                'Risk Code': 'Risk',
-                'POLICY_NUMBER': 'Policy No.',
-                'INSURED_NAME': 'Client Name',
-                'POLICY_EXP_DATE': 'Policy End Date',
-                'DOC': 'Policy Start Date',
-                'OFFICE_CODE': 'Branch',
-                'Type': 'Income Category',
-                'ENDORSEMENT_NUMBER': 'Endorsement No.',
-                'Master Pol. No.': 'ASP Practice',
-                '': 'P & L JV',
-                'PREMIUM_AMOUNT': 'Premium',
-                'COMMISSION_AMOUNT': 'Brokerage'
+                'f': 'Risk',
+                's': 'Policy No.',
+                'x': 'Client Name',
+                'z': 'Policy End Date',
+                '  ': 'Policy Start Date',
+                'dsaf': 'Branch',
+                'safwe': 'Income Category',
+                'ajoajd': 'Endorsement No.',
+                'djaifljdail;': 'ASP Practice',
+                'dsafqwera': 'P & L JV',
+                'vmmvmvmvmvmv': 'Premium',
+                'dsajkfl;ajkl;dfjaskl;': 'Brokerage'
                                                       } 
         elif selected_insurer == 'Aviva Life Insurance Co. India Pvt. Ltd.':
 

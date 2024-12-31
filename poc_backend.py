@@ -8947,7 +8947,13 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
                     if pd.isna(row['P & L JV']) or row['P & L JV'].strip() == '':
                         policy_no = str(row['Policy No.']).strip()
                         # Check if 'Policy No.' ends with '-E' followed by digits (e.g., '-E2343')
-                        if policy_no.endswith('-E') or ('-E' in policy_no and policy_no.split('-E')[-1].isdigit()):
+                        if policy_no.endswith('-EE') or ('-EE' in policy_no and policy_no.split('-EE')[-1].isdigit()):
+                            row['P & L JV'] = 'Endorsement'
+                            print(f"Set 'P & L JV' to 'Endorsement' for Policy No.: {policy_no}")
+                        elif policy_no.endswith('-EXE') or ('-EXE' in policy_no and policy_no.split('-EXE')[-1].isdigit()):
+                            row['P & L JV'] = 'Endorsement'
+                            print(f"Set 'P & L JV' to 'Endorsement' for Policy No.: {policy_no}")
+                        elif policy_no.endswith('-ER') or ('-ER' in policy_no and policy_no.split('-ER')[-1].isdigit()):
                             row['P & L JV'] = 'Endorsement'
                             print(f"Set 'P & L JV' to 'Endorsement' for Policy No.: {policy_no}")
                     return row
@@ -15494,34 +15500,6 @@ def process_iffco_tokyo_insurer(file_path, template_data, risk_code_data, cust_n
             print(f"Supplier name from 'table_4': {supplier_name_col}")
 
             # Check for blank fields after mapping and before adding GST/TDS rows
-            required_fields = ['Client Name', 'Policy No.', 'Risk', 'Policy Start Date', 'Policy End Date', 'Premium']
-            missing_required = False
-
-            # Iterate through each required field to check for missing values
-            for field in required_fields:
-                if field not in processed_df.columns:
-                    missing_required = True
-                    break
-                if processed_df[field].isnull().any() or (processed_df[field].astype(str).str.strip() == '').any():
-                    missing_required = True
-                    break
-
-            # Handle missing required fields
-            if missing_required:
-                error_message = (
-                    "Missing required fields in the dataset.\n"
-                    "    Please ensure all required fields are filled.\n"
-                    "    Check for empty cells in the required columns.\n"
-                    "    Validate the data before processing."
-                )
-                print(error_message)
-                raise ValueError(error_message)
-            else:
-                print("No missing required fields found.")
-
-
-            # 'P & L JV' logic continues here...
-
             # 'Narration' logic
             if gst_present:
                 if not np.isclose(float(narration_value_original.replace(',', '')), net_amount_value, atol=0.01):
@@ -16956,6 +16934,38 @@ def process_sbi_life_insurance_co(file_path, template_data, risk_code_data, cust
         else:
             print("'Income category' column not found in processed_df after mapping.")
 
+        if 'Income category' in processed_df.columns:
+            state_lookups_sheet4 = pd.read_excel(
+                r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
+                r'\Common folder AP & AR\Brokerage Statement Automation\support files'
+                r'\state_lookups.xlsx',
+                sheet_name='Sheet4',
+            )
+            state_lookups_sheet4['BUSINESS_TYPE'] = (
+                state_lookups_sheet4['BUSINESS_TYPE']
+                .astype(str)
+                .str.strip()
+                .str.lower()
+            )
+            state_lookups_sheet4['lookups'] = (
+            state_lookups_sheet4['lookups'].astype(str).str.strip()
+            )
+            processed_df['Income category'] = (
+                processed_df['Income category']
+                .astype(str)
+                .str.strip()
+                .str.lower()
+            )
+            income_category_lookup = (
+                state_lookups_sheet4.set_index('BUSINESS_TYPE')['lookups']
+                .to_dict()
+            )
+            processed_df['Income category'] = processed_df['Income category'].map(
+                income_category_lookup
+            ).fillna('')
+        else:
+            processed_df['Income category'] = ''
+
         # Clean 'Client Name' field to remove extra spaces
         if 'Client Name' in processed_df.columns:
             processed_df['Client Name'] = processed_df['Client Name'].astype(str).str.strip()
@@ -17355,7 +17365,7 @@ def process_sbi_life_insurance_co(file_path, template_data, risk_code_data, cust
                     'Entry No.': [''] * 2,
                     'Debtor Name': [df_section['Debtor Name'].iloc[0]] * 2,
                     'Nature of Transaction': ["GST Receipts", "Brokerage Statement"],
-                    'AccountType': [df_section['AccountType'].iloc[0], 'G/L Account'],
+                    'AccountType': ['Customer', 'Customer'],
                     'Debtor Branch Ref': [df_section['Debtor Branch Ref'].iloc[0]] * 2,
                     'Client Name': ["GST @ 18%", "TDS Receivable - AY 2025-26"],
                     'Policy No.': ['', ''],
@@ -20401,7 +20411,7 @@ def process_shriram_life_insurance_co(file_path, template_data, risk_code_data, 
                 new_row_tds = {
                     'Entry No.': '',
                     'Debtor Name': processed_df['Debtor Name'].iloc[0],
-                    'Nature of Transaction': "TDS Receivable - AY 2025-26",
+                    'Nature of Transaction': "Brokerage Statement",
                     'AccountType': "G/L Account" if not gst_present else processed_df['AccountType'].iloc[0],
                     'Debtor Branch Ref': processed_df['Debtor Branch Ref'].iloc[0],
                     'Client Name': "TDS Receivable - AY 2025-26",
@@ -20877,7 +20887,7 @@ def proces_aegon_life_insurance_co(file_path, template_data, risk_code_data, cus
                 new_row_tds = {
                     'Entry No.': '',
                     'Debtor Name': processed_df['Debtor Name'].iloc[0],
-                    'Nature of Transaction': "TDS Receivable - AY 2025-26",
+                    'Nature of Transaction': "Brokerage Statement",
                     'AccountType': "G/L Account" if not gst_present else processed_df['AccountType'].iloc[0],
                     'Debtor Branch Ref': processed_df['Debtor Branch Ref'].iloc[0],
                     'Client Name': "TDS Receivable - AY 2025-26",
@@ -21354,7 +21364,7 @@ def process_indialife_first_insurance(file_path, template_data, risk_code_data, 
                 new_row_tds = {
                     'Entry No.': '',
                     'Debtor Name': processed_df['Debtor Name'].iloc[0],
-                    'Nature of Transaction': "TDS Receivable - AY 2025-26",
+                    'Nature of Transaction': "Brokerage Statement",
                     'AccountType': "G/L Account" if not gst_present else processed_df['AccountType'].iloc[0],
                     'Debtor Branch Ref': processed_df['Debtor Branch Ref'].iloc[0],
                     'Client Name': "TDS Receivable - AY 2025-26",
@@ -21828,7 +21838,7 @@ def kotak_life_insurance_co(file_path, template_data, risk_code_data, cust_neft_
                 new_row_tds = {
                     'Entry No.': '',
                     'Debtor Name': processed_df['Debtor Name'].iloc[0],
-                    'Nature of Transaction': "TDS Receivable - AY 2025-26",
+                    'Nature of Transaction': "Brokerage Statement",
                     'AccountType': "G/L Account" if not gst_present else processed_df['AccountType'].iloc[0],
                     'Debtor Branch Ref': processed_df['Debtor Branch Ref'].iloc[0],
                     'Client Name': "TDS Receivable - AY 2025-26",
