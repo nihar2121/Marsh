@@ -22070,7 +22070,7 @@ def process_national_insurance_limited(
             if 'Endorsement No.' in processed_df.columns and 'P & L JV' in processed_df.columns:
                 def process_endorsement(row):
                     endorsement_no = str(row['Endorsement No.']).strip()
-                    if endorsement_no in ['0', '00', '000']:
+                    if endorsement_no in ['0', '00', '000', 'nan']:
                         row['Endorsement No.'] = ''
                         row['P & L JV'] = ''
                     elif endorsement_no.upper() == 'G01 1':
@@ -22081,6 +22081,9 @@ def process_national_insurance_limited(
                         row['P & L JV'] = ''
                     return row
                 processed_df = processed_df.apply(process_endorsement, axis=1)
+                processed_df['Endorsement No.'] = processed_df['Endorsement No.'].replace({np.nan: ''})
+                processed_df['Endorsement No.'] = processed_df['Endorsement No.'].replace({'nan': '', 'NAN': '', 'NaN': ''})
+
                 print("Endorsement logic applied.")
 
             # Clean numeric columns
