@@ -10313,42 +10313,57 @@ def process_relaince_general_insurance_co(file_path, template_data, risk_code_da
             else:
                 processed_df['Branch'] = ''
 
+# ---- Updated Risk Code Mapping Section ----
             if 'Risk' in processed_df.columns:
                 print("Processing 'Risk' column for risk code mapping.")
-                # Open 'Risk code.xlsx' from support files folder
+                
+                # Define the path to the Risk code lookup file
                 risk_code_path = (
                     r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
                     r'\Common folder AP & AR\Brokerage Statement Automation\support files\Risk code.xlsx'
                 )
-                # Skip first row and use second row as headers
-                risk_code_df = pd.read_excel(risk_code_path, sheet_name='RISK CODE', header=1)
-                print("Risk code data loaded successfully.")
                 
-                # Clean column names and data
+                # Read the Risk code data, skipping the first row (header=1)
+                try:
+                    risk_code_df = pd.read_excel(risk_code_path, sheet_name='RISK CODE', header=1)
+                    print("Risk code data loaded successfully.")
+                except Exception as e:
+                    print(f"Failed to load Risk code data: {str(e)}")
+                    raise
+                
+                # Clean column names and strip whitespace from relevant columns
                 risk_code_df.columns = risk_code_df.columns.str.strip()
                 processed_df['Risk'] = processed_df['Risk'].astype(str).str.strip()
                 risk_code_df['Reliance Code'] = risk_code_df['Reliance Code'].astype(str).str.strip()
                 
-                # Merge with risk code data
+                # Ensure that 'Reliance Code' is unique by keeping the first occurrence
+                risk_code_df = risk_code_df.drop_duplicates(subset=['Reliance Code'], keep='first')
+                print(f"Risk code data after dropping duplicates has {risk_code_df.shape[0]} unique Reliance Codes.")
+                
+                # Perform a left merge to bring in 'Reliance Description' where 'Risk' matches 'Reliance Code'
                 processed_df = processed_df.merge(
                     risk_code_df[['Reliance Code', 'Reliance Description']],
                     how='left',
                     left_on='Risk',
                     right_on='Reliance Code'
                 )
+                print(f"After merging, DataFrame has {processed_df.shape[0]} rows.")
                 
-                # For each Risk value, take the first matching Reliance Description
-                processed_df['Reliance Description'] = processed_df.groupby('Risk')['Reliance Description'].transform('first')
+                # Replace 'Risk' with 'Reliance Description' where a match is found
+                # If 'Reliance Description' is NaN (no match), keep the original 'Risk' value
+                processed_df['Risk'] = processed_df.apply(
+                    lambda row: row['Reliance Description'] if pd.notna(row['Reliance Description']) else row['Risk'],
+                    axis=1
+                )
                 
-                # Update 'Risk' column with 'Reliance Description' where match found
-                processed_df['Risk'] = processed_df['Reliance Description'].fillna(processed_df['Risk'])
-                
-                # Drop the extra columns
-                processed_df = processed_df.drop(columns=['Reliance Code', 'Reliance Description'])
+                # Drop the extra columns added by the merge
+                processed_df = processed_df.drop(columns=['Reliance Code', 'Reliance Description'], errors='ignore')
                 
                 print("Risk code mapping applied successfully.")
             else:
                 print("'Risk' column not found in processed DataFrame.")
+            # ---- End of Updated Risk Code Mapping Section ----
+
             # Calculate sum of 'Brokerage'
             sum_brokerage = processed_df['Brokerage'].astype(str).apply(
                 lambda x: float(str(x).replace(',', '').replace('(', '').replace(')', '')) if x != '' else 0.0
@@ -10489,7 +10504,7 @@ def process_relaince_general_insurance_co(file_path, template_data, risk_code_da
                         processed_df['Service Tax Ledger'].iloc[0],
                         '2300022'
                     ],
-                    'TDS Ledger': ['TDS Receivable - AY 2025-26'] * 2,
+                    'TDS Ledger': [processed_df['TDS Ledger'].iloc[-1],'TDS Receivable - AY 2025-26'],
                     'RepDate': [processed_df['RepDate'].iloc[-1]] * 2,
                     'Branch': ['', ''],
                     'Income category': ['', ''],
