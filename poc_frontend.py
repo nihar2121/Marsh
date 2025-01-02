@@ -75,10 +75,15 @@ login_page = """
         color: #fff;
         text-align: center;
         padding: 1rem 0;
-        font-size: 0.9rem;
+        font-size: 1rem;
       }
       .alert {
         margin-top: 1rem;
+        font-size: 1.1rem;
+      }
+      label {
+        font-size: 1.1rem;
+        font-weight: 600;
       }
       input:focus {
         box-shadow: none;
@@ -89,6 +94,8 @@ login_page = """
         border: none;
         transition: background-color 0.3s;
         letter-spacing: 1px;
+        font-size: 1.1rem;
+        padding: 0.75rem;
       }
       .btn-primary:hover {
         background-color: #003366;
@@ -187,7 +194,7 @@ search_page = """
         color: #fff;
         text-align: center;
         padding: 1rem 0;
-        font-size: 0.9rem;
+        font-size: 1rem;
       }
       .select2-container--default .select2-selection--single {
         height: 50px;
@@ -196,6 +203,7 @@ search_page = """
       }
       .select2-selection__rendered {
         line-height: 50px;
+        font-size: 1.1rem;
       }
       .select2-selection__arrow {
         height: 50px;
@@ -205,9 +213,15 @@ search_page = """
         border: none;
         transition: background-color 0.3s;
         letter-spacing: 1px;
+        font-size: 1.1rem;
+        padding: 0.75rem;
       }
       .btn-primary:hover {
         background-color: #003366;
+      }
+      label {
+        font-size: 1.1rem;
+        font-weight: 600;
       }
     </style>
   </head>
@@ -283,7 +297,7 @@ email_preview_page = """
         border-radius: 16px;
         box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
         width: 100%;
-        max-width: 1400px;
+        max-width: 1200px;
         transition: transform 0.3s ease;
       }
       .preview-form:hover {
@@ -302,16 +316,17 @@ email_preview_page = """
         color: #fff;
         text-align: center;
         padding: 1rem 0;
-        font-size: 0.9rem;
+        font-size: 1rem;
       }
       .email-body-container {
-        max-height: 65vh;
+        max-height: 40vh; /* Reduced height for compactness */
         overflow-y: auto;
-        margin-bottom: 2rem;
-        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        padding: 1rem;
         border: 1px solid #ced4da;
         border-radius: 8px;
         background-color: #f8f9fa;
+        font-size: 1.1rem; /* Increased font size */
       }
       table {
         width: 100%;
@@ -324,6 +339,7 @@ email_preview_page = """
       th, td {
         padding: 14px;
         text-align: left;
+        font-size: 1.1rem; /* Increased font size */
       }
       th {
         background-color: #e9ecef;
@@ -332,7 +348,7 @@ email_preview_page = """
         min-width: 120px;
         margin: 0 0.5rem;
         padding: 0.75rem 1rem;
-        font-size: 1rem;
+        font-size: 1.1rem;
         border-radius: 8px;
         transition: background-color 0.3s, transform 0.2s;
       }
@@ -362,6 +378,10 @@ email_preview_page = """
       .btn-secondary:hover {
         background-color: #5a6268;
         transform: scale(1.05);
+      }
+      label {
+        font-size: 1.1rem;
+        font-weight: 600;
       }
     </style>
   </head>
@@ -460,7 +480,7 @@ dropdown_page = """
         color: #fff;
         text-align: center;
         padding: 1rem 0;
-        font-size: 0.9rem;
+        font-size: 1rem;
       }
       .select2-container--default .select2-selection--single {
         height: 50px;
@@ -469,6 +489,7 @@ dropdown_page = """
       }
       .select2-selection__rendered {
         line-height: 50px;
+        font-size: 1.1rem;
       }
       .select2-selection__arrow {
         height: 50px;
@@ -478,9 +499,15 @@ dropdown_page = """
         border: none;
         transition: background-color 0.3s;
         letter-spacing: 1px;
+        font-size: 1.1rem;
+        padding: 0.75rem;
       }
       .btn-primary:hover {
         background-color: #003366;
+      }
+      label {
+        font-size: 1.1rem;
+        font-weight: 600;
       }
     </style>
   </head>
@@ -578,7 +605,7 @@ mapping_page = """
         color: #fff;
         text-align: center;
         padding: 1rem 0;
-        font-size: 0.9rem;
+        font-size: 1rem;
       }
       .mapping-form-content {
         max-height: 70vh;
@@ -588,6 +615,7 @@ mapping_page = """
         border: 1px solid #ced4da;
         border-radius: 8px;
         background-color: #f8f9fa;
+        font-size: 1.1rem;
       }
       .constant-label {
         background-color: #e9ecef;
@@ -604,13 +632,15 @@ mapping_page = """
         border: none;
         transition: background-color 0.3s;
         letter-spacing: 1px;
+        font-size: 1.1rem;
+        padding: 0.75rem;
       }
       .btn-primary:hover {
         background-color: #003366;
       }
       label {
+        font-size: 1.1rem;
         font-weight: 600;
-        color: #333;
       }
       select.form-control {
         border-radius: 8px;
@@ -659,7 +689,6 @@ mapping_page = """
   </body>
 </html>
 """
-
 
 
 
