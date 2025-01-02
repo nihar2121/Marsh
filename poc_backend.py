@@ -10315,39 +10315,40 @@ def process_relaince_general_insurance_co(file_path, template_data, risk_code_da
 
             if 'Risk' in processed_df.columns:
                 print("Processing 'Risk' column for risk code mapping.")
-                if processed_df['Risk'].notna().all():
-                    print("'Risk' column contains only valid numbers. Proceeding with risk code mapping.")
-                    # Ensure 'Risk' is integer
-                    processed_df['Risk'] = processed_df['Risk'].astype(int)
-                    # Open 'Risk code.xlsx' from support files folder, open 'Sheet1'
-                    risk_code_path = (
-                        r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
-                        r'\Common folder AP & AR\Brokerage Statement Automation\support files\Risk code.xlsx'
-                    )
-                    risk_code_df = pd.read_excel(risk_code_path, sheet_name='Sheet1')
-                    print("Risk code data loaded successfully.")
-                    # Clean column names
-                    risk_code_df.columns = risk_code_df.columns.str.strip()
-                    # Ensure 'PRODUCT_4DIGIT_CODE' and 'PRODUCT_NAME' are strings
-                    processed_df['Risk'] = processed_df['Risk'].astype(str).str.strip()
-                    risk_code_df['PRODUCT_4DIGIT_CODE'] = risk_code_df['PRODUCT_4DIGIT_CODE'].astype(str).str.strip()
-                    # Merge
-                    processed_df = processed_df.merge(
-                        risk_code_df[['PRODUCT_4DIGIT_CODE', 'PRODUCT_NAME']],
-                        how='left',
-                        left_on='Risk',
-                        right_on='PRODUCT_4DIGIT_CODE'
-                    )
-                    # Update 'Risk' column with 'PRODUCT_NAME' where match found
-                    processed_df['Risk'] = processed_df['PRODUCT_NAME'].fillna(processed_df['Risk'])
-                    # Drop the extra columns
-                    processed_df = processed_df.drop(columns=['PRODUCT_4DIGIT_CODE', 'PRODUCT_NAME'])
-                    print("Risk code mapping applied successfully.")
-                else:
-                    print("'Risk' column contains non-numeric values. Skipping risk code mapping.")
+                # Open 'Risk code.xlsx' from support files folder
+                risk_code_path = (
+                    r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
+                    r'\Common folder AP & AR\Brokerage Statement Automation\support files\Risk code.xlsx'
+                )
+                # Skip first row and use second row as headers
+                risk_code_df = pd.read_excel(risk_code_path, sheet_name='RISK CODE', header=1)
+                print("Risk code data loaded successfully.")
+                
+                # Clean column names and data
+                risk_code_df.columns = risk_code_df.columns.str.strip()
+                processed_df['Risk'] = processed_df['Risk'].astype(str).str.strip()
+                risk_code_df['Reliance Code'] = risk_code_df['Reliance Code'].astype(str).str.strip()
+                
+                # Merge with risk code data
+                processed_df = processed_df.merge(
+                    risk_code_df[['Reliance Code', 'Reliance Description']],
+                    how='left',
+                    left_on='Risk',
+                    right_on='Reliance Code'
+                )
+                
+                # For each Risk value, take the first matching Reliance Description
+                processed_df['Reliance Description'] = processed_df.groupby('Risk')['Reliance Description'].transform('first')
+                
+                # Update 'Risk' column with 'Reliance Description' where match found
+                processed_df['Risk'] = processed_df['Reliance Description'].fillna(processed_df['Risk'])
+                
+                # Drop the extra columns
+                processed_df = processed_df.drop(columns=['Reliance Code', 'Reliance Description'])
+                
+                print("Risk code mapping applied successfully.")
             else:
                 print("'Risk' column not found in processed DataFrame.")
-
             # Calculate sum of 'Brokerage'
             sum_brokerage = processed_df['Brokerage'].astype(str).apply(
                 lambda x: float(str(x).replace(',', '').replace('(', '').replace(')', '')) if x != '' else 0.0
