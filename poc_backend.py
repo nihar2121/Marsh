@@ -13116,9 +13116,36 @@ def process_manipal_health_insurance_company(file_path, template_data, risk_code
                 print("'Premium' or 'Brokerage' column not in processed data, cannot calculate 'Brokerage Rate'.")
 
             # 'Income Category' comes from mappings
-            if 'Income Category' not in processed_df.columns:
-                processed_df['Income Category'] = ''
-                print("'Income Category' not in processed data, setting to empty.")
+            if 'Income category' in processed_df.columns:
+                state_lookups_sheet4 = pd.read_excel(
+                    r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
+                    r'\Common folder AP & AR\Brokerage Statement Automation\support files\state_lookups.xlsx',
+                    sheet_name='Sheet4',
+                )
+                state_lookups_sheet4['BUSINESS_TYPE'] = (
+                    state_lookups_sheet4['BUSINESS_TYPE']
+                    .astype(str)
+                    .str.strip()
+                    .str.lower()
+                )
+                state_lookups_sheet4['lookups'] = (
+                    state_lookups_sheet4['lookups'].astype(str).str.strip()
+                )
+                processed_df['Income category'] = (
+                    processed_df['Income category']
+                    .astype(str)
+                    .str.strip()
+                    .str.lower()
+                )
+                income_category_lookup = (
+                    state_lookups_sheet4.set_index('BUSINESS_TYPE')['lookups']
+                    .to_dict()
+                )
+                processed_df['Income category'] = processed_df['Income category'].map(
+                    income_category_lookup
+                ).fillna('')
+            else:
+                processed_df['Income category'] = ''
 
             # Set 'Entry No.' and other columns
             processed_df['Entry No.'] = range(1, len(processed_df) + 1)
@@ -16596,14 +16623,6 @@ def process_aditya_birla_sun_life(file_path, template_data, risk_code_data, cust
                 print("Processed 'P & L JV' based on 'Endorsement No.'")
             else:
                 print("'Endorsement No.' not in processed data, setting 'P & L JV' to empty.")
-
-            # Remove rows where both 'Premium' and 'Brokerage' are 0
-            if 'Premium' in processed_df.columns and 'Brokerage' in processed_df.columns:
-                processed_df[['Premium', 'Brokerage']] = processed_df[['Premium', 'Brokerage']].apply(pd.to_numeric, errors='coerce').fillna(0)
-                processed_df = processed_df[~((processed_df['Premium'] == 0) & (processed_df['Brokerage'] == 0))]
-                print("Removed rows where both 'Premium' and 'Brokerage' are 0.")
-            else:
-                print("'Premium' or 'Brokerage' column not in processed data.")
 
             # Ensure numeric columns are handled correctly after mappings
             numeric_columns = ['Premium', 'Brokerage']
