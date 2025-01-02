@@ -45,7 +45,7 @@ login_page = """
       }
       .login-form {
         background: rgba(255, 255, 255, 0.95);
-        padding: 4rem 5rem;
+        padding: 3rem 4rem;
         border-radius: 16px;
         box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
         width: 100%;
@@ -65,7 +65,7 @@ login_page = """
       .app-title {
         text-align: center;
         font-size: 2rem;
-        margin-bottom: 1.5rem;
+        margin-bottom: 1rem;
         color: #004080;
         font-weight: bold;
         letter-spacing: 2px;
@@ -164,7 +164,7 @@ search_page = """
       }
       .search-form {
         background: rgba(255, 255, 255, 0.95);
-        padding: 4rem 5rem;
+        padding: 3rem 4rem;
         border-radius: 16px;
         box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
         width: 100%;
@@ -293,7 +293,7 @@ email_preview_page = """
       }
       .preview-form {
         background: rgba(255, 255, 255, 0.95);
-        padding: 4rem 5rem;
+        padding: 3rem 4rem;
         border-radius: 16px;
         box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
         width: 100%;
@@ -319,9 +319,9 @@ email_preview_page = """
         font-size: 1rem;
       }
       .email-body-container {
-        max-height: 40vh; /* Reduced height for compactness */
+        max-height: 50vh; /* Increased height for better visibility */
         overflow-y: auto;
-        margin-bottom: 1.5rem;
+        margin-bottom: 1rem;
         padding: 1rem;
         border: 1px solid #ced4da;
         border-radius: 8px;
@@ -450,7 +450,7 @@ dropdown_page = """
       }
       .dropdown-form {
         background: rgba(255, 255, 255, 0.95);
-        padding: 4rem 5rem;
+        padding: 3rem 4rem;
         border-radius: 16px;
         box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
         width: 100%;
@@ -582,7 +582,7 @@ mapping_page = """
       }
       .mapping-form {
         background: rgba(255, 255, 255, 0.95);
-        padding: 4rem 5rem;
+        padding: 3rem 4rem;
         border-radius: 16px;
         box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
         width: 100%;
@@ -591,6 +591,13 @@ mapping_page = """
       }
       .mapping-form:hover {
         transform: translateY(-5px);
+      }
+      .logo {
+        width: 140px;
+        display: block;
+        margin: 0 auto 1.5rem;
+        border-radius: 50%;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
       }
       .app-title {
         text-align: center;
@@ -608,7 +615,7 @@ mapping_page = """
         font-size: 1rem;
       }
       .mapping-form-content {
-        max-height: 70vh;
+        max-height: 60vh;
         overflow-y: auto;
         margin-bottom: 2rem;
         padding: 1rem;
@@ -654,6 +661,7 @@ mapping_page = """
   <body>
     <div class="content-wrapper">
       <form class="mapping-form" method="post">
+        <img src="https://i.pinimg.com/736x/b1/ba/ab/b1baab2ab9b18dc74d8a925f036dd598.jpg" alt="Marsh McLennan Logo" class="logo">
         <div class="app-title">StatementFlow</div>
         <h2 class="text-center mb-4">Edit Column Mapping</h2>
         <div class="mapping-form-content">
@@ -689,6 +697,7 @@ mapping_page = """
   </body>
 </html>
 """
+
 
 
 
