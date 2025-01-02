@@ -23,85 +23,89 @@ login_page = """
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
     <title>StatementFlow - Login</title>
-    <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
     <style>
       body {
-        font-family: 'Roboto', sans-serif;
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-        height: 100vh;
-        margin: 0;
+        background: linear-gradient(180deg, #004080, #c8c8ff);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       }
       .login-container {
         display: flex;
         justify-content: center;
         align-items: center;
-        height: calc(100vh - 56px); /* Adjust for navbar height */
+        min-height: 80vh;
       }
       .login-form {
         background: white;
         padding: 2.5rem;
         border-radius: 10px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
         width: 100%;
         max-width: 400px;
       }
       .logo {
-        width: 120px;
+        width: 100px;
         display: block;
-        margin: 0 auto 1.5rem;
+        margin: 0 auto 1rem;
       }
-      .btn-primary {
-        background-color: #1e3c72;
-        border: none;
-      }
-      .btn-primary:hover {
-        background-color: #2a5298;
+      .footer {
+        text-align: center;
+        padding: 1rem 0;
+        color: #fff;
+        background-color: rgba(0, 0, 0, 0.5);
+        position: fixed;
+        width: 100%;
+        bottom: 0;
       }
       .navbar-brand {
-        font-weight: 500;
+        font-weight: bold;
         font-size: 1.5rem;
       }
     </style>
   </head>
   <body>
     <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-      <div class="container">
-        <a class="navbar-brand" href="#">StatementFlow</a>
-      </div>
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #002060;">
+      <a class="navbar-brand" href="#">StatementFlow</a>
     </nav>
 
     <!-- Login Form -->
     <div class="login-container">
       <form class="login-form" method="post">
-        <img src="https://i.pinimg.com/736x/b1/ba/ab/b1baab2ab9b18dc74d8a925f036dd598.jpg" alt="StatementFlow Logo" class="logo">
-        <h3 class="text-center mb-4">Welcome to StatementFlow</h3>
+        <img src="https://i.pinimg.com/736x/b1/ba/ab/b1baab2ab9b18dc74d8a925f036dd598.jpg" alt="Marsh McLennan Logo" class="logo">
+        <h3 class="text-center mb-4">Login to StatementFlow</h3>
         {% if error %}
           <div class="alert alert-danger" role="alert">
             {{ error }}
           </div>
         {% endif %}
-        <div class="mb-3">
-          <label for="username" class="form-label">Username:</label>
-          <input type="text" id="username" name="username" class="form-control" required>
+        <div class="form-group">
+          <label for="username">Username:</label>
+          <input type="text" id="username" name="username" class="form-control" placeholder="Enter your username">
         </div>
-        <div class="mb-4">
-          <label for="password" class="form-label">Password:</label>
-          <input type="password" id="password" name="password" class="form-control" required>
+        <div class="form-group">
+          <label for="password">Password:</label>
+          <input type="password" id="password" name="password" class="form-control" placeholder="Enter your password">
         </div>
-        <div class="d-grid">
-          <button type="submit" class="btn btn-primary">Login</button>
+        <div class="form-group text-center">
+          <button type="submit" class="btn btn-primary btn-block">Login</button>
         </div>
       </form>
     </div>
 
-    <!-- Bootstrap 5 JS and dependencies -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container">
+        <span>2025 StatementFlow. All rights reserved. Powered by Relentless.AI</span>
+      </div>
+    </footer>
+
+    <!-- Optional JavaScript -->
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
   </body>
 </html>
 """
@@ -112,46 +116,71 @@ search_page = """
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- Bootstrap CSS -->
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Select2 CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
-    <title>Select Email File</title>
+    <title>StatementFlow - Select Email</title>
     <style>
+      body {
+        background: linear-gradient(180deg, #004080, #c8c8ff);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }
       .search-container {
         display: flex;
         justify-content: center;
-        align-items: center; /* Center alignment */
-        height: 100vh;
-        background: linear-gradient(180deg, #004080, #c8c8ff);
+        align-items: center;
+        min-height: 80vh;
       }
       .search-form {
         background: white;
-        padding: 2rem;
-        border-radius: 8px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        padding: 2.5rem;
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
         width: 100%;
         max-width: 600px;
         text-align: center;
       }
       .logo {
-        width: 150px;
+        width: 100px;
         margin: 0 auto 1rem;
       }
-      .select2-container .select2-selection--single {
-        height: 40px;
+      .footer {
+        text-align: center;
+        padding: 1rem 0;
+        color: #fff;
+        background-color: rgba(0, 0, 0, 0.5);
+        position: fixed;
+        width: 100%;
+        bottom: 0;
+      }
+      .navbar-brand {
+        font-weight: bold;
+        font-size: 1.5rem;
+      }
+      .select2-container--default .select2-selection--single {
+        height: 50px;
+        border-radius: 5px;
       }
       .select2-selection__rendered {
-        line-height: 38px;
+        line-height: 50px;
       }
       .select2-selection__arrow {
-        height: 38px;
+        height: 50px;
       }
     </style>
   </head>
   <body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #002060;">
+      <a class="navbar-brand" href="#">StatementFlow</a>
+    </nav>
+
+    <!-- Search Form -->
     <div class="search-container">
       <form class="search-form" method="post">
         <img src="https://i.pinimg.com/736x/b1/ba/ab/b1baab2ab9b18dc74d8a925f036dd598.jpg" alt="Marsh McLennan Logo" class="logo">
-        <h2 class="text-center">Select Email File</h2>
+        <h3 class="text-center mb-4">Select Email File</h3>
         <div class="form-group">
           <label for="email_file">Select Email:</label>
           <select id="email_file" name="email_file" class="form-control">
@@ -161,10 +190,19 @@ search_page = """
           </select>
         </div>
         <div class="form-group text-center">
-          <button type="submit" class="btn btn-primary">Process Email</button>
+          <button type="submit" class="btn btn-primary btn-block">Process Email</button>
         </div>
       </form>
     </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container">
+        <span>2025 StatementFlow. All rights reserved. Powered by Relentless.AI</span>
+      </div>
+    </footer>
+
+    <!-- jQuery and Select2 JS -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
     <script>
@@ -173,7 +211,6 @@ search_page = """
           placeholder: 'Select an email',
           width: '100%',
           dropdownAutoWidth: true,
-          dropdownCssClass: 'bigdrop',
           maximumSelectionLength: 1,
         });
       });
@@ -188,52 +225,74 @@ email_preview_page = """
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- Bootstrap CSS -->
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
-    <title>Email Preview</title>
+    <title>StatementFlow - Email Preview</title>
     <style>
+      body {
+        background: linear-gradient(180deg, #004080, #c8c8ff);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }
       .preview-container {
         display: flex;
         justify-content: center;
         align-items: center;
-        height: 100vh;
-        background: linear-gradient(180deg, #004080, #c8c8ff);
-        overflow: auto;
+        min-height: 80vh;
+        padding: 2rem;
       }
       .preview-form {
         background: white;
-        padding: 1rem;
-        border-radius: 8px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        padding: 2.5rem;
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
         width: 100%;
-        max-width: 1200px;  /* Increased width */
-        max-height: 80vh;
+        max-width: 1200px;
         overflow: auto;
       }
       .email-body-container {
         max-height: 60vh;
         overflow-y: auto;
-        margin-bottom: 1rem;
+        margin-bottom: 1.5rem;
       }
       table {
         width: 100%;
         border-collapse: collapse;
       }
       table, th, td {
-        border: 1px solid black;
+        border: 1px solid #dee2e6;
       }
       th, td {
-        padding: 8px;
+        padding: 10px;
         text-align: left;
       }
-      .alert {
-        margin-bottom: 1rem;
+      .footer {
+        text-align: center;
+        padding: 1rem 0;
+        color: #fff;
+        background-color: rgba(0, 0, 0, 0.5);
+        position: fixed;
+        width: 100%;
+        bottom: 0;
+      }
+      .navbar-brand {
+        font-weight: bold;
+        font-size: 1.5rem;
+      }
+      .btn-group {
+        margin-top: 1rem;
       }
     </style>
   </head>
   <body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #002060;">
+      <a class="navbar-brand" href="#">StatementFlow</a>
+    </nav>
+
+    <!-- Email Preview -->
     <div class="preview-container">
       <div class="preview-form">
-        <h2 class="text-center">Email Preview</h2>
+        <h3 class="text-center mb-4">Email Preview</h3>
         {% if already_processed == 'yes' %}
           <div class="alert alert-warning text-center" role="alert">
             This email has already been processed. Are you sure you want to reprocess it?
@@ -242,13 +301,22 @@ email_preview_page = """
         <div class="email-body-container">
           <div>{{ email_body|safe }}</div>
         </div>
-        <div class="text-center">
-          <button class="btn btn-success" id="yesButton">Yes</button>
-          <button class="btn btn-danger" id="noButton">No</button>
+        <div class="btn-group text-center">
+          <button class="btn btn-success mr-2" id="yesButton">Yes</button>
+          <button class="btn btn-danger mr-2" id="noButton">No</button>
           <button class="btn btn-secondary" onclick="window.history.back()">Cancel</button>
         </div>
       </div>
     </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container">
+        <span>2025 StatementFlow. All rights reserved. Powered by Relentless.AI</span>
+      </div>
+    </footer>
+
+    <!-- Optional JavaScript -->
     <script>
       document.getElementById("yesButton").onclick = function() {
         window.location.href = '/select_insurer?file_name={{ file_name }}&subject={{ subject }}';
@@ -258,6 +326,8 @@ email_preview_page = """
         window.history.back();
       };
     </script>
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
   </body>
 </html>
 """
@@ -268,40 +338,65 @@ dropdown_page = """
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- Bootstrap CSS -->
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Select2 CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
-    <title>Select Insurer</title>
+    <title>StatementFlow - Select Insurer</title>
     <style>
+      body {
+        background: linear-gradient(180deg, #004080, #c8c8ff);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }
       .dropdown-container {
         display: flex;
         justify-content: center;
-        align-items: center;  /* Center alignment */
-        height: 100vh;
-        background: linear-gradient(180deg, #004080, #c8c8ff);
+        align-items: center;
+        min-height: 80vh;
       }
       .dropdown-form {
         background: white;
-        padding: 2rem;
-        border-radius: 8px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        padding: 2.5rem;
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
         width: 100%;
         max-width: 600px;
       }
-      .select2-container .select2-selection--single {
-        height: 40px;
+      .footer {
+        text-align: center;
+        padding: 1rem 0;
+        color: #fff;
+        background-color: rgba(0, 0, 0, 0.5);
+        position: fixed;
+        width: 100%;
+        bottom: 0;
+      }
+      .navbar-brand {
+        font-weight: bold;
+        font-size: 1.5rem;
+      }
+      .select2-container--default .select2-selection--single {
+        height: 50px;
+        border-radius: 5px;
       }
       .select2-selection__rendered {
-        line-height: 38px;
+        line-height: 50px;
       }
       .select2-selection__arrow {
-        height: 38px;
+        height: 50px;
       }
     </style>
   </head>
   <body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #002060;">
+      <a class="navbar-brand" href="#">StatementFlow</a>
+    </nav>
+
+    <!-- Dropdown Form -->
     <div class="dropdown-container">
       <form class="dropdown-form" method="post">
-        <h2 class="text-center">Select Insurer</h2>
+        <h3 class="text-center mb-4">Select Insurer</h3>
         <div class="form-group">
           <label for="insurer">Insurer Name:</label>
           <select id="insurer" name="insurer" class="form-control">
@@ -311,10 +406,19 @@ dropdown_page = """
           </select>
         </div>
         <div class="form-group text-center">
-          <button type="submit" class="btn btn-primary">Process</button>
+          <button type="submit" class="btn btn-primary btn-block">Process</button>
         </div>
       </form>
     </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container">
+        <span>2025 StatementFlow. All rights reserved. Powered by Relentless.AI</span>
+      </div>
+    </footer>
+
+    <!-- jQuery and Select2 JS -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
     <script>
@@ -323,13 +427,13 @@ dropdown_page = """
           placeholder: 'Select an insurer',
           width: '100%',
           dropdownAutoWidth: true,
-          dropdownCssClass: 'bigdrop',
           maximumSelectionLength: 1,
         });
       });
     </script>
   </body>
 </html>
+
 """
 
 mapping_page = """
@@ -338,30 +442,36 @@ mapping_page = """
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- Bootstrap CSS -->
     <link
       href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
       rel="stylesheet"
     >
-    <title>Column Mapping</title>
+    <title>StatementFlow - Column Mapping</title>
     <style>
+      body {
+        background: linear-gradient(180deg, #004080, #c8c8ff);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }
       .mapping-container {
         display: flex;
         justify-content: center;
         align-items: center;
-        height: 100vh;
-        background: linear-gradient(180deg, #004080, #c8c8ff);
+        min-height: 80vh;
+        padding: 2rem;
       }
       .mapping-form {
         background: white;
-        padding: 2rem;
-        border-radius: 8px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        padding: 2.5rem;
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
         width: 100%;
-        max-width: 600px;
+        max-width: 800px;
       }
       .mapping-form-content {
-        max-height: 60vh; /* Adjust as needed */
-        overflow-y: auto; /* Add vertical scrollbar */
+        max-height: 60vh;
+        overflow-y: auto;
+        margin-bottom: 1.5rem;
       }
       .constant-label {
         background-color: #e9ecef;
@@ -371,37 +481,69 @@ mapping_page = """
         width: 100%;
         text-align: left;
       }
+      .footer {
+        text-align: center;
+        padding: 1rem 0;
+        color: #fff;
+        background-color: rgba(0, 0, 0, 0.5);
+        position: fixed;
+        width: 100%;
+        bottom: 0;
+      }
+      .navbar-brand {
+        font-weight: bold;
+        font-size: 1.5rem;
+      }
     </style>
   </head>
   <body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #002060;">
+      <a class="navbar-brand" href="#">StatementFlow</a>
+    </nav>
+
+    <!-- Mapping Form -->
     <div class="mapping-container">
       <form class="mapping-form" method="post">
-        <h2 class="text-center">Edit Column Mapping</h2>
+        <h3 class="text-center mb-4">Edit Column Mapping</h3>
         <div class="mapping-form-content">
           <div class="form-group">
             {% for mapping in mappings %}
-            <div class="form-group">
-              <label>{{ mapping.source_col }}:</label>
-              {% if mapping.editable %}
-                <select id="mapping_{{ loop.index }}" name="mapping_{{ loop.index }}" class="form-control">
-                  <option value="" disabled selected>Select an option</option>
-                  {% for col in all_columns %}
-                  <option value="{{ col }}" {% if col == mapping.dest_col %}selected{% endif %}>{{ col }}</option>
-                  {% endfor %}
-                </select>
-              {% else %}
-                <span class="constant-label">{{ mapping.dest_col }}</span>
-                <input type="hidden" name="mapping_{{ loop.index }}" value="{{ mapping.dest_col }}">
-              {% endif %}
+            <div class="form-group row">
+              <label class="col-sm-4 col-form-label">{{ mapping.source_col }}:</label>
+              <div class="col-sm-8">
+                {% if mapping.editable %}
+                  <select id="mapping_{{ loop.index }}" name="mapping_{{ loop.index }}" class="form-control">
+                    <option value="" disabled selected>Select an option</option>
+                    {% for col in all_columns %}
+                    <option value="{{ col }}" {% if col == mapping.dest_col %}selected{% endif %}>{{ col }}</option>
+                    {% endfor %}
+                  </select>
+                {% else %}
+                  <span class="constant-label">{{ mapping.dest_col }}</span>
+                  <input type="hidden" name="mapping_{{ loop.index }}" value="{{ mapping.dest_col }}">
+                {% endif %}
+              </div>
             </div>
             {% endfor %}
           </div>
         </div>
         <div class="form-group text-center">
-          <button type="submit" class="btn btn-primary">Process</button>
+          <button type="submit" class="btn btn-primary btn-block">Process</button>
         </div>
       </form>
     </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container">
+        <span>2025 StatementFlow. All rights reserved. Powered by Relentless.AI</span>
+      </div>
+    </footer>
+
+    <!-- Optional JavaScript -->
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
   </body>
 </html>
 """
