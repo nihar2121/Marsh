@@ -29,54 +29,69 @@ login_page = """
     <title>StatementFlow - Login</title>
     <style>
       body {
-        background: linear-gradient(180deg, #004080, #c8c8ff);
+        background: linear-gradient(135deg, #004080, #c8c8ff);
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       }
       .login-container {
         display: flex;
         justify-content: center;
         align-items: center;
-        min-height: 80vh;
+        min-height: 100vh;
       }
       .login-form {
-        background: white;
-        padding: 2.5rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        background: rgba(255, 255, 255, 0.95);
+        padding: 3rem;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
         width: 100%;
-        max-width: 400px;
+        max-width: 450px;
+        position: relative;
       }
       .logo {
-        width: 100px;
+        width: 120px;
         display: block;
-        margin: 0 auto 1rem;
+        margin: 0 auto 1.5rem;
+        border-radius: 50%;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      }
+      .app-title {
+        text-align: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        color: #004080;
+        font-weight: bold;
       }
       .footer {
-        text-align: center;
-        padding: 1rem 0;
-        color: #fff;
-        background-color: rgba(0, 0, 0, 0.5);
-        position: fixed;
+        position: absolute;
+        bottom: -60px;
         width: 100%;
-        bottom: 0;
+        text-align: center;
+        color: #fff;
+        font-size: 0.9rem;
       }
-      .navbar-brand {
-        font-weight: bold;
-        font-size: 1.5rem;
+      .alert {
+        margin-top: 1rem;
+      }
+      input:focus {
+        box-shadow: none;
+        border-color: #004080;
+      }
+      .btn-primary {
+        background-color: #004080;
+        border: none;
+        transition: background-color 0.3s;
+      }
+      .btn-primary:hover {
+        background-color: #003366;
       }
     </style>
   </head>
   <body>
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #002060;">
-      <a class="navbar-brand" href="#">StatementFlow</a>
-    </nav>
-
-    <!-- Login Form -->
     <div class="login-container">
       <form class="login-form" method="post">
         <img src="https://i.pinimg.com/736x/b1/ba/ab/b1baab2ab9b18dc74d8a925f036dd598.jpg" alt="Marsh McLennan Logo" class="logo">
-        <h3 class="text-center mb-4">Login to StatementFlow</h3>
+        <div class="app-title">StatementFlow</div>
+        <h2 class="text-center mb-4">Login</h2>
         {% if error %}
           <div class="alert alert-danger" role="alert">
             {{ error }}
@@ -84,28 +99,22 @@ login_page = """
         {% endif %}
         <div class="form-group">
           <label for="username">Username:</label>
-          <input type="text" id="username" name="username" class="form-control" placeholder="Enter your username">
+          <input type="text" id="username" name="username" class="form-control" required>
         </div>
         <div class="form-group">
           <label for="password">Password:</label>
-          <input type="password" id="password" name="password" class="form-control" placeholder="Enter your password">
+          <input type="password" id="password" name="password" class="form-control" required>
         </div>
         <div class="form-group text-center">
           <button type="submit" class="btn btn-primary btn-block">Login</button>
         </div>
+        <div class="footer">
+          &copy; {{ current_year }} StatementFlow. All rights reserved. Powered by Relentless.AI
+        </div>
       </form>
     </div>
-
-    <!-- Footer -->
-    <footer class="footer">
-      <div class="container">
-        <span>2025 StatementFlow. All rights reserved. Powered by Relentless.AI</span>
-      </div>
-    </footer>
-
     <!-- Optional JavaScript -->
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
   </body>
 </html>
 """
@@ -123,67 +132,76 @@ search_page = """
     <title>StatementFlow - Select Email</title>
     <style>
       body {
-        background: linear-gradient(180deg, #004080, #c8c8ff);
+        background: linear-gradient(135deg, #004080, #c8c8ff);
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       }
       .search-container {
         display: flex;
         justify-content: center;
         align-items: center;
-        min-height: 80vh;
+        min-height: 100vh;
       }
       .search-form {
-        background: white;
-        padding: 2.5rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        background: rgba(255, 255, 255, 0.95);
+        padding: 3rem;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
         width: 100%;
-        max-width: 600px;
-        text-align: center;
+        max-width: 700px;
+        position: relative;
       }
       .logo {
-        width: 100px;
-        margin: 0 auto 1rem;
+        width: 120px;
+        display: block;
+        margin: 0 auto 1.5rem;
+        border-radius: 50%;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      }
+      .app-title {
+        text-align: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        color: #004080;
+        font-weight: bold;
       }
       .footer {
-        text-align: center;
-        padding: 1rem 0;
-        color: #fff;
-        background-color: rgba(0, 0, 0, 0.5);
-        position: fixed;
+        position: absolute;
+        bottom: -60px;
         width: 100%;
-        bottom: 0;
-      }
-      .navbar-brand {
-        font-weight: bold;
-        font-size: 1.5rem;
+        text-align: center;
+        color: #fff;
+        font-size: 0.9rem;
       }
       .select2-container--default .select2-selection--single {
-        height: 50px;
+        height: 45px;
         border-radius: 5px;
+        border: 1px solid #ced4da;
       }
       .select2-selection__rendered {
-        line-height: 50px;
+        line-height: 45px;
       }
       .select2-selection__arrow {
-        height: 50px;
+        height: 45px;
+      }
+      .btn-primary {
+        background-color: #004080;
+        border: none;
+        transition: background-color 0.3s;
+      }
+      .btn-primary:hover {
+        background-color: #003366;
       }
     </style>
   </head>
   <body>
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #002060;">
-      <a class="navbar-brand" href="#">StatementFlow</a>
-    </nav>
-
-    <!-- Search Form -->
     <div class="search-container">
       <form class="search-form" method="post">
         <img src="https://i.pinimg.com/736x/b1/ba/ab/b1baab2ab9b18dc74d8a925f036dd598.jpg" alt="Marsh McLennan Logo" class="logo">
-        <h3 class="text-center mb-4">Select Email File</h3>
+        <div class="app-title">StatementFlow</div>
+        <h2 class="text-center mb-4">Select Email File</h2>
         <div class="form-group">
           <label for="email_file">Select Email:</label>
-          <select id="email_file" name="email_file" class="form-control">
+          <select id="email_file" name="email_file" class="form-control" required>
             {% for file in email_files %}
               <option value="{{ file }}">{{ file }}</option>
             {% endfor %}
@@ -192,18 +210,14 @@ search_page = """
         <div class="form-group text-center">
           <button type="submit" class="btn btn-primary btn-block">Process Email</button>
         </div>
+        <div class="footer">
+          &copy; {{ current_year }} StatementFlow. All rights reserved. Powered by Relentless.AI
+        </div>
       </form>
     </div>
-
-    <!-- Footer -->
-    <footer class="footer">
-      <div class="container">
-        <span>2025 StatementFlow. All rights reserved. Powered by Relentless.AI</span>
-      </div>
-    </footer>
-
-    <!-- jQuery and Select2 JS -->
+    <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <!-- Select2 JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
     <script>
       $(document).ready(function() {
@@ -211,6 +225,7 @@ search_page = """
           placeholder: 'Select an email',
           width: '100%',
           dropdownAutoWidth: true,
+          dropdownCssClass: 'bigdrop',
           maximumSelectionLength: 1,
         });
       });
@@ -230,69 +245,99 @@ email_preview_page = """
     <title>StatementFlow - Email Preview</title>
     <style>
       body {
-        background: linear-gradient(180deg, #004080, #c8c8ff);
+        background: linear-gradient(135deg, #004080, #c8c8ff);
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       }
       .preview-container {
         display: flex;
         justify-content: center;
         align-items: center;
-        min-height: 80vh;
+        min-height: 100vh;
         padding: 2rem;
       }
       .preview-form {
-        background: white;
-        padding: 2.5rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        background: rgba(255, 255, 255, 0.95);
+        padding: 2rem;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
         width: 100%;
-        max-width: 1200px;
-        overflow: auto;
+        max-width: 1300px;
+        position: relative;
+      }
+      .app-title {
+        text-align: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        color: #004080;
+        font-weight: bold;
+      }
+      .footer {
+        position: absolute;
+        bottom: -60px;
+        width: 100%;
+        text-align: center;
+        color: #fff;
+        font-size: 0.9rem;
       }
       .email-body-container {
         max-height: 60vh;
         overflow-y: auto;
         margin-bottom: 1.5rem;
+        padding: 1rem;
+        border: 1px solid #ced4da;
+        border-radius: 8px;
+        background-color: #f8f9fa;
       }
       table {
         width: 100%;
         border-collapse: collapse;
+        margin-top: 1rem;
       }
       table, th, td {
         border: 1px solid #dee2e6;
       }
       th, td {
-        padding: 10px;
+        padding: 12px;
         text-align: left;
       }
-      .footer {
-        text-align: center;
-        padding: 1rem 0;
-        color: #fff;
-        background-color: rgba(0, 0, 0, 0.5);
-        position: fixed;
-        width: 100%;
-        bottom: 0;
+      th {
+        background-color: #e9ecef;
       }
-      .navbar-brand {
-        font-weight: bold;
-        font-size: 1.5rem;
+      .btn-success, .btn-danger, .btn-secondary {
+        min-width: 100px;
+        margin: 0 0.5rem;
       }
-      .btn-group {
-        margin-top: 1rem;
+      .btn-success {
+        background-color: #28a745;
+        border: none;
+        transition: background-color 0.3s;
+      }
+      .btn-success:hover {
+        background-color: #218838;
+      }
+      .btn-danger {
+        background-color: #dc3545;
+        border: none;
+        transition: background-color 0.3s;
+      }
+      .btn-danger:hover {
+        background-color: #c82333;
+      }
+      .btn-secondary {
+        background-color: #6c757d;
+        border: none;
+        transition: background-color 0.3s;
+      }
+      .btn-secondary:hover {
+        background-color: #5a6268;
       }
     </style>
   </head>
   <body>
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #002060;">
-      <a class="navbar-brand" href="#">StatementFlow</a>
-    </nav>
-
-    <!-- Email Preview -->
     <div class="preview-container">
       <div class="preview-form">
-        <h3 class="text-center mb-4">Email Preview</h3>
+        <div class="app-title">StatementFlow</div>
+        <h2 class="text-center mb-4">Email Preview</h2>
         {% if already_processed == 'yes' %}
           <div class="alert alert-warning text-center" role="alert">
             This email has already been processed. Are you sure you want to reprocess it?
@@ -301,22 +346,16 @@ email_preview_page = """
         <div class="email-body-container">
           <div>{{ email_body|safe }}</div>
         </div>
-        <div class="btn-group text-center">
-          <button class="btn btn-success mr-2" id="yesButton">Yes</button>
-          <button class="btn btn-danger mr-2" id="noButton">No</button>
+        <div class="text-center mb-4">
+          <button class="btn btn-success" id="yesButton">Yes</button>
+          <button class="btn btn-danger" id="noButton">No</button>
           <button class="btn btn-secondary" onclick="window.history.back()">Cancel</button>
+        </div>
+        <div class="footer">
+          &copy; {{ current_year }} StatementFlow. All rights reserved. Powered by Relentless.AI
         </div>
       </div>
     </div>
-
-    <!-- Footer -->
-    <footer class="footer">
-      <div class="container">
-        <span>2025 StatementFlow. All rights reserved. Powered by Relentless.AI</span>
-      </div>
-    </footer>
-
-    <!-- Optional JavaScript -->
     <script>
       document.getElementById("yesButton").onclick = function() {
         window.location.href = '/select_insurer?file_name={{ file_name }}&subject={{ subject }}';
@@ -326,8 +365,6 @@ email_preview_page = """
         window.history.back();
       };
     </script>
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
   </body>
 </html>
 """
@@ -345,61 +382,68 @@ dropdown_page = """
     <title>StatementFlow - Select Insurer</title>
     <style>
       body {
-        background: linear-gradient(180deg, #004080, #c8c8ff);
+        background: linear-gradient(135deg, #004080, #c8c8ff);
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       }
       .dropdown-container {
         display: flex;
         justify-content: center;
         align-items: center;
-        min-height: 80vh;
+        min-height: 100vh;
       }
       .dropdown-form {
-        background: white;
-        padding: 2.5rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        background: rgba(255, 255, 255, 0.95);
+        padding: 3rem;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
         width: 100%;
-        max-width: 600px;
+        max-width: 700px;
+        position: relative;
+      }
+      .app-title {
+        text-align: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        color: #004080;
+        font-weight: bold;
       }
       .footer {
-        text-align: center;
-        padding: 1rem 0;
-        color: #fff;
-        background-color: rgba(0, 0, 0, 0.5);
-        position: fixed;
+        position: absolute;
+        bottom: -60px;
         width: 100%;
-        bottom: 0;
-      }
-      .navbar-brand {
-        font-weight: bold;
-        font-size: 1.5rem;
+        text-align: center;
+        color: #fff;
+        font-size: 0.9rem;
       }
       .select2-container--default .select2-selection--single {
-        height: 50px;
+        height: 45px;
         border-radius: 5px;
+        border: 1px solid #ced4da;
       }
       .select2-selection__rendered {
-        line-height: 50px;
+        line-height: 45px;
       }
       .select2-selection__arrow {
-        height: 50px;
+        height: 45px;
+      }
+      .btn-primary {
+        background-color: #004080;
+        border: none;
+        transition: background-color 0.3s;
+      }
+      .btn-primary:hover {
+        background-color: #003366;
       }
     </style>
   </head>
   <body>
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #002060;">
-      <a class="navbar-brand" href="#">StatementFlow</a>
-    </nav>
-
-    <!-- Dropdown Form -->
     <div class="dropdown-container">
       <form class="dropdown-form" method="post">
-        <h3 class="text-center mb-4">Select Insurer</h3>
+        <div class="app-title">StatementFlow</div>
+        <h2 class="text-center mb-4">Select Insurer</h2>
         <div class="form-group">
           <label for="insurer">Insurer Name:</label>
-          <select id="insurer" name="insurer" class="form-control">
+          <select id="insurer" name="insurer" class="form-control" required>
             {% for insurer in insurers %}
               <option value="{{ insurer }}">{{ insurer }}</option>
             {% endfor %}
@@ -408,18 +452,14 @@ dropdown_page = """
         <div class="form-group text-center">
           <button type="submit" class="btn btn-primary btn-block">Process</button>
         </div>
+        <div class="footer">
+          &copy; {{ current_year }} StatementFlow. All rights reserved. Powered by Relentless.AI
+        </div>
       </form>
     </div>
-
-    <!-- Footer -->
-    <footer class="footer">
-      <div class="container">
-        <span>2025 StatementFlow. All rights reserved. Powered by Relentless.AI</span>
-      </div>
-    </footer>
-
-    <!-- jQuery and Select2 JS -->
+    <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <!-- Select2 JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
     <script>
       $(document).ready(function() {
@@ -427,13 +467,13 @@ dropdown_page = """
           placeholder: 'Select an insurer',
           width: '100%',
           dropdownAutoWidth: true,
+          dropdownCssClass: 'bigdrop',
           maximumSelectionLength: 1,
         });
       });
     </script>
   </body>
 </html>
-
 """
 
 mapping_page = """
@@ -450,23 +490,31 @@ mapping_page = """
     <title>StatementFlow - Column Mapping</title>
     <style>
       body {
-        background: linear-gradient(180deg, #004080, #c8c8ff);
+        background: linear-gradient(135deg, #004080, #c8c8ff);
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       }
       .mapping-container {
         display: flex;
         justify-content: center;
         align-items: center;
-        min-height: 80vh;
+        min-height: 100vh;
         padding: 2rem;
       }
       .mapping-form {
-        background: white;
-        padding: 2.5rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        background: rgba(255, 255, 255, 0.95);
+        padding: 3rem;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
         width: 100%;
         max-width: 800px;
+        position: relative;
+      }
+      .app-title {
+        text-align: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        color: #004080;
+        font-weight: bold;
       }
       .mapping-form-content {
         max-height: 60vh;
@@ -475,37 +523,44 @@ mapping_page = """
       }
       .constant-label {
         background-color: #e9ecef;
-        padding: 0.5rem;
+        padding: 0.75rem;
         border-radius: 5px;
         display: inline-block;
         width: 100%;
         text-align: left;
+        font-weight: bold;
       }
       .footer {
-        text-align: center;
-        padding: 1rem 0;
-        color: #fff;
-        background-color: rgba(0, 0, 0, 0.5);
-        position: fixed;
+        position: absolute;
+        bottom: -60px;
         width: 100%;
-        bottom: 0;
+        text-align: center;
+        color: #fff;
+        font-size: 0.9rem;
       }
-      .navbar-brand {
-        font-weight: bold;
-        font-size: 1.5rem;
+      .btn-primary {
+        background-color: #004080;
+        border: none;
+        transition: background-color 0.3s;
+      }
+      .btn-primary:hover {
+        background-color: #003366;
+      }
+      label {
+        font-weight: 600;
+        color: #333;
+      }
+      select.form-control {
+        border-radius: 5px;
+        border: 1px solid #ced4da;
       }
     </style>
   </head>
   <body>
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #002060;">
-      <a class="navbar-brand" href="#">StatementFlow</a>
-    </nav>
-
-    <!-- Mapping Form -->
     <div class="mapping-container">
       <form class="mapping-form" method="post">
-        <h3 class="text-center mb-4">Edit Column Mapping</h3>
+        <div class="app-title">StatementFlow</div>
+        <h2 class="text-center mb-4">Edit Column Mapping</h2>
         <div class="mapping-form-content">
           <div class="form-group">
             {% for mapping in mappings %}
@@ -513,10 +568,10 @@ mapping_page = """
               <label class="col-sm-4 col-form-label">{{ mapping.source_col }}:</label>
               <div class="col-sm-8">
                 {% if mapping.editable %}
-                  <select id="mapping_{{ loop.index }}" name="mapping_{{ loop.index }}" class="form-control">
+                  <select id="mapping_{{ loop.index }}" name="mapping_{{ loop.index }}" class="form-control" required>
                     <option value="" disabled selected>Select an option</option>
                     {% for col in all_columns %}
-                    <option value="{{ col }}" {% if col == mapping.dest_col %}selected{% endif %}>{{ col }}</option>
+                      <option value="{{ col }}" {% if col == mapping.dest_col %}selected{% endif %}>{{ col }}</option>
                     {% endfor %}
                   </select>
                 {% else %}
@@ -531,19 +586,11 @@ mapping_page = """
         <div class="form-group text-center">
           <button type="submit" class="btn btn-primary btn-block">Process</button>
         </div>
+        <div class="footer">
+          &copy; {{ current_year }} StatementFlow. All rights reserved. Powered by Relentless.AI
+        </div>
       </form>
     </div>
-
-    <!-- Footer -->
-    <footer class="footer">
-      <div class="container">
-        <span>2025 StatementFlow. All rights reserved. Powered by Relentless.AI</span>
-      </div>
-    </footer>
-
-    <!-- Optional JavaScript -->
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
   </body>
 </html>
 """
