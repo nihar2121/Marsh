@@ -10144,13 +10144,31 @@ def process_relaince_general_insurance_co(file_path, template_data, risk_code_da
             for col in ['Policy No.', 'Endorsement No.']:
                 if col in processed_df.columns:
                     processed_df[col] = processed_df[col].astype(str).str.replace("’", "'", regex=False).str.replace("‘", "'", regex=False)
-
+            # After reading the data, add this to handle Policy No.
+            if 'Policy No.' in mapped_df.columns:
+                # Convert to string and remove everything after decimal point
+                mapped_df['Policy No.'] = mapped_df['Policy No.'].apply(
+                    lambda x: str(int(float(x))) if pd.notna(x) and str(x).replace('.','').replace('-','').isdigit() 
+                    else str(x)
+                )
             # Make 'Endorsement No.' blank if it contains '00' or '0' and set 'P & L JV' accordingly
             if 'Endorsement No.' in processed_df.columns:
                 processed_df['Endorsement No.'] = processed_df['Endorsement No.'].apply(
-                    lambda x: '' if str(x).strip() in ['00', '0', '0.00', '0.0'] else x
+                    lambda x: str(int(float(x))) if pd.notna(x) and str(x).replace('.','').replace('-','').isdigit() 
+                        and str(x).strip() not in ['00', '0', '0.00', '0.0']
+                    else ''
                 )
                 # Set 'P & L JV' based on 'Endorsement No.'
+            # Replace the existing Endorsement No. processing with:
+            if 'Endorsement No.' in processed_df.columns:
+                processed_df['Endorsement No.'] = processed_df['Endorsement No.'].apply(
+                    lambda x: '{:.0f}'.format(float(x)) if pd.notna(x) and str(x).replace('.','').isdigit() and str(x).strip() not in ['00', '0', '0.00', '0.0']
+                    else ''
+                )
+                # Set 'P & L JV' based on 'Endorsement No.'
+                processed_df['P & L JV'] = processed_df['Endorsement No.'].apply(
+                    lambda x: 'Endorsement' if pd.notna(x) and str(x).strip() != '' else ''
+                )                
                 processed_df['P & L JV'] = processed_df['Endorsement No.'].apply(
                     lambda x: 'Endorsement' if pd.notna(x) and str(x).strip() != '' else ''
                 )
@@ -10271,6 +10289,64 @@ def process_relaince_general_insurance_co(file_path, template_data, risk_code_da
             processed_df['Service Tax Ledger'] = ''
             processed_df['Narration'] = ''
             processed_df['Policy Type'] = ''
+
+            if 'Branch' in processed_df.columns:
+                state_lookups_sheet2 = pd.read_excel(
+                    r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
+                    r'\Common folder AP & AR\Brokerage Statement Automation\support files'
+                    r'\state_lookups.xlsx',
+                    sheet_name='Sheet2',
+                )
+                state_lookups_sheet2['state'] = (
+                    state_lookups_sheet2['state'].astype(str).str.strip().str.lower()
+                )
+                state_lookups_sheet2['shortform'] = (
+                    state_lookups_sheet2['shortform'].astype(str).str.strip()
+                )
+                processed_df['Branch'] = (
+                    processed_df['Branch'].astype(str).str.strip().str.lower()
+                )
+                branch_lookup = state_lookups_sheet2.set_index('state')[
+                    'shortform'
+                ].to_dict()
+                processed_df['Branch'] = processed_df['Branch'].map(branch_lookup).fillna('')
+            else:
+                processed_df['Branch'] = ''
+
+            if 'Risk' in processed_df.columns:
+                print("Processing 'Risk' column for risk code mapping.")
+                if processed_df['Risk'].notna().all():
+                    print("'Risk' column contains only valid numbers. Proceeding with risk code mapping.")
+                    # Ensure 'Risk' is integer
+                    processed_df['Risk'] = processed_df['Risk'].astype(int)
+                    # Open 'Risk code.xlsx' from support files folder, open 'Sheet1'
+                    risk_code_path = (
+                        r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
+                        r'\Common folder AP & AR\Brokerage Statement Automation\support files\Risk code.xlsx'
+                    )
+                    risk_code_df = pd.read_excel(risk_code_path, sheet_name='Sheet1')
+                    print("Risk code data loaded successfully.")
+                    # Clean column names
+                    risk_code_df.columns = risk_code_df.columns.str.strip()
+                    # Ensure 'PRODUCT_4DIGIT_CODE' and 'PRODUCT_NAME' are strings
+                    processed_df['Risk'] = processed_df['Risk'].astype(str).str.strip()
+                    risk_code_df['PRODUCT_4DIGIT_CODE'] = risk_code_df['PRODUCT_4DIGIT_CODE'].astype(str).str.strip()
+                    # Merge
+                    processed_df = processed_df.merge(
+                        risk_code_df[['PRODUCT_4DIGIT_CODE', 'PRODUCT_NAME']],
+                        how='left',
+                        left_on='Risk',
+                        right_on='PRODUCT_4DIGIT_CODE'
+                    )
+                    # Update 'Risk' column with 'PRODUCT_NAME' where match found
+                    processed_df['Risk'] = processed_df['PRODUCT_NAME'].fillna(processed_df['Risk'])
+                    # Drop the extra columns
+                    processed_df = processed_df.drop(columns=['PRODUCT_4DIGIT_CODE', 'PRODUCT_NAME'])
+                    print("Risk code mapping applied successfully.")
+                else:
+                    print("'Risk' column contains non-numeric values. Skipping risk code mapping.")
+            else:
+                print("'Risk' column not found in processed DataFrame.")
 
             # Calculate sum of 'Brokerage'
             sum_brokerage = processed_df['Brokerage'].astype(str).apply(
