@@ -595,6 +595,7 @@ mapping_page = """
 </html>
 """
 
+
 @app.route('/', methods=['GET', 'POST'])
 def login():
     error = None
