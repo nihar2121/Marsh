@@ -31,42 +31,50 @@ login_page = """
       body {
         background: linear-gradient(135deg, #004080, #c8c8ff);
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color: #333;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
       }
-      .login-container {
+      .content-wrapper {
+        flex: 1;
         display: flex;
         justify-content: center;
         align-items: center;
-        min-height: 100vh;
+        padding: 2rem;
       }
       .login-form {
         background: rgba(255, 255, 255, 0.95);
-        padding: 3rem;
-        border-radius: 12px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        padding: 4rem 5rem;
+        border-radius: 16px;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
         width: 100%;
-        max-width: 450px;
-        position: relative;
+        max-width: 600px;
+        transition: transform 0.3s ease;
+      }
+      .login-form:hover {
+        transform: translateY(-5px);
       }
       .logo {
-        width: 120px;
+        width: 140px;
         display: block;
         margin: 0 auto 1.5rem;
         border-radius: 50%;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
       }
       .app-title {
         text-align: center;
-        font-size: 1.5rem;
-        margin-bottom: 1rem;
+        font-size: 2rem;
+        margin-bottom: 1.5rem;
         color: #004080;
         font-weight: bold;
+        letter-spacing: 2px;
       }
       .footer {
-        position: absolute;
-        bottom: -60px;
-        width: 100%;
-        text-align: center;
+        background-color: #003366;
         color: #fff;
+        text-align: center;
+        padding: 1rem 0;
         font-size: 0.9rem;
       }
       .alert {
@@ -80,6 +88,7 @@ login_page = """
         background-color: #004080;
         border: none;
         transition: background-color 0.3s;
+        letter-spacing: 1px;
       }
       .btn-primary:hover {
         background-color: #003366;
@@ -87,7 +96,7 @@ login_page = """
     </style>
   </head>
   <body>
-    <div class="login-container">
+    <div class="content-wrapper">
       <form class="login-form" method="post">
         <img src="https://i.pinimg.com/736x/b1/ba/ab/b1baab2ab9b18dc74d8a925f036dd598.jpg" alt="Marsh McLennan Logo" class="logo">
         <div class="app-title">StatementFlow</div>
@@ -108,11 +117,11 @@ login_page = """
         <div class="form-group text-center">
           <button type="submit" class="btn btn-primary btn-block">Login</button>
         </div>
-        <div class="footer">
-          &copy; {{ current_year }} StatementFlow. All rights reserved. Powered by Relentless.AI
-        </div>
       </form>
     </div>
+    <footer class="footer">
+      &copy; {{ current_year }} StatementFlow. All rights reserved. Powered by Relentless.AI
+    </footer>
     <!-- Optional JavaScript -->
     <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
   </body>
@@ -134,59 +143,68 @@ search_page = """
       body {
         background: linear-gradient(135deg, #004080, #c8c8ff);
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color: #333;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
       }
-      .search-container {
+      .content-wrapper {
+        flex: 1;
         display: flex;
         justify-content: center;
         align-items: center;
-        min-height: 100vh;
+        padding: 2rem;
       }
       .search-form {
         background: rgba(255, 255, 255, 0.95);
-        padding: 3rem;
-        border-radius: 12px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        padding: 4rem 5rem;
+        border-radius: 16px;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
         width: 100%;
-        max-width: 700px;
-        position: relative;
+        max-width: 800px;
+        transition: transform 0.3s ease;
+      }
+      .search-form:hover {
+        transform: translateY(-5px);
       }
       .logo {
-        width: 120px;
+        width: 140px;
         display: block;
         margin: 0 auto 1.5rem;
         border-radius: 50%;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
       }
       .app-title {
         text-align: center;
-        font-size: 1.5rem;
-        margin-bottom: 1rem;
+        font-size: 2rem;
+        margin-bottom: 1.5rem;
         color: #004080;
         font-weight: bold;
+        letter-spacing: 2px;
       }
       .footer {
-        position: absolute;
-        bottom: -60px;
-        width: 100%;
-        text-align: center;
+        background-color: #003366;
         color: #fff;
+        text-align: center;
+        padding: 1rem 0;
         font-size: 0.9rem;
       }
       .select2-container--default .select2-selection--single {
-        height: 45px;
-        border-radius: 5px;
+        height: 50px;
+        border-radius: 8px;
         border: 1px solid #ced4da;
       }
       .select2-selection__rendered {
-        line-height: 45px;
+        line-height: 50px;
       }
       .select2-selection__arrow {
-        height: 45px;
+        height: 50px;
       }
       .btn-primary {
         background-color: #004080;
         border: none;
         transition: background-color 0.3s;
+        letter-spacing: 1px;
       }
       .btn-primary:hover {
         background-color: #003366;
@@ -194,7 +212,7 @@ search_page = """
     </style>
   </head>
   <body>
-    <div class="search-container">
+    <div class="content-wrapper">
       <form class="search-form" method="post">
         <img src="https://i.pinimg.com/736x/b1/ba/ab/b1baab2ab9b18dc74d8a925f036dd598.jpg" alt="Marsh McLennan Logo" class="logo">
         <div class="app-title">StatementFlow</div>
@@ -210,11 +228,11 @@ search_page = """
         <div class="form-group text-center">
           <button type="submit" class="btn btn-primary btn-block">Process Email</button>
         </div>
-        <div class="footer">
-          &copy; {{ current_year }} StatementFlow. All rights reserved. Powered by Relentless.AI
-        </div>
       </form>
     </div>
+    <footer class="footer">
+      &copy; {{ current_year }} StatementFlow. All rights reserved. Powered by Relentless.AI
+    </footer>
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <!-- Select2 JS -->
@@ -247,43 +265,50 @@ email_preview_page = """
       body {
         background: linear-gradient(135deg, #004080, #c8c8ff);
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color: #333;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
       }
-      .preview-container {
+      .content-wrapper {
+        flex: 1;
         display: flex;
         justify-content: center;
         align-items: center;
-        min-height: 100vh;
         padding: 2rem;
       }
       .preview-form {
         background: rgba(255, 255, 255, 0.95);
-        padding: 2rem;
-        border-radius: 12px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        padding: 4rem 5rem;
+        border-radius: 16px;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
         width: 100%;
-        max-width: 1300px;
-        position: relative;
+        max-width: 1400px;
+        transition: transform 0.3s ease;
+      }
+      .preview-form:hover {
+        transform: translateY(-5px);
       }
       .app-title {
         text-align: center;
-        font-size: 1.5rem;
+        font-size: 2rem;
         margin-bottom: 1rem;
         color: #004080;
         font-weight: bold;
+        letter-spacing: 2px;
       }
       .footer {
-        position: absolute;
-        bottom: -60px;
-        width: 100%;
-        text-align: center;
+        background-color: #003366;
         color: #fff;
+        text-align: center;
+        padding: 1rem 0;
         font-size: 0.9rem;
       }
       .email-body-container {
-        max-height: 60vh;
+        max-height: 65vh;
         overflow-y: auto;
-        margin-bottom: 1.5rem;
-        padding: 1rem;
+        margin-bottom: 2rem;
+        padding: 1.5rem;
         border: 1px solid #ced4da;
         border-radius: 8px;
         background-color: #f8f9fa;
@@ -297,44 +322,51 @@ email_preview_page = """
         border: 1px solid #dee2e6;
       }
       th, td {
-        padding: 12px;
+        padding: 14px;
         text-align: left;
       }
       th {
         background-color: #e9ecef;
       }
       .btn-success, .btn-danger, .btn-secondary {
-        min-width: 100px;
+        min-width: 120px;
         margin: 0 0.5rem;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        border-radius: 8px;
+        transition: background-color 0.3s, transform 0.2s;
       }
       .btn-success {
         background-color: #28a745;
         border: none;
-        transition: background-color 0.3s;
+        color: #fff;
       }
       .btn-success:hover {
         background-color: #218838;
+        transform: scale(1.05);
       }
       .btn-danger {
         background-color: #dc3545;
         border: none;
-        transition: background-color 0.3s;
+        color: #fff;
       }
       .btn-danger:hover {
         background-color: #c82333;
+        transform: scale(1.05);
       }
       .btn-secondary {
         background-color: #6c757d;
         border: none;
-        transition: background-color 0.3s;
+        color: #fff;
       }
       .btn-secondary:hover {
         background-color: #5a6268;
+        transform: scale(1.05);
       }
     </style>
   </head>
   <body>
-    <div class="preview-container">
+    <div class="content-wrapper">
       <div class="preview-form">
         <div class="app-title">StatementFlow</div>
         <h2 class="text-center mb-4">Email Preview</h2>
@@ -351,11 +383,11 @@ email_preview_page = """
           <button class="btn btn-danger" id="noButton">No</button>
           <button class="btn btn-secondary" onclick="window.history.back()">Cancel</button>
         </div>
-        <div class="footer">
-          &copy; {{ current_year }} StatementFlow. All rights reserved. Powered by Relentless.AI
-        </div>
       </div>
     </div>
+    <footer class="footer">
+      &copy; {{ current_year }} StatementFlow. All rights reserved. Powered by Relentless.AI
+    </footer>
     <script>
       document.getElementById("yesButton").onclick = function() {
         window.location.href = '/select_insurer?file_name={{ file_name }}&subject={{ subject }}';
@@ -384,52 +416,68 @@ dropdown_page = """
       body {
         background: linear-gradient(135deg, #004080, #c8c8ff);
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color: #333;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
       }
-      .dropdown-container {
+      .content-wrapper {
+        flex: 1;
         display: flex;
         justify-content: center;
         align-items: center;
-        min-height: 100vh;
+        padding: 2rem;
       }
       .dropdown-form {
         background: rgba(255, 255, 255, 0.95);
-        padding: 3rem;
-        border-radius: 12px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        padding: 4rem 5rem;
+        border-radius: 16px;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
         width: 100%;
-        max-width: 700px;
-        position: relative;
+        max-width: 800px;
+        transition: transform 0.3s ease;
+      }
+      .dropdown-form:hover {
+        transform: translateY(-5px);
+      }
+      .logo {
+        width: 140px;
+        display: block;
+        margin: 0 auto 1.5rem;
+        border-radius: 50%;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
       }
       .app-title {
         text-align: center;
-        font-size: 1.5rem;
-        margin-bottom: 1rem;
+        font-size: 2rem;
+        margin-bottom: 1.5rem;
         color: #004080;
         font-weight: bold;
+        letter-spacing: 2px;
       }
       .footer {
-        position: absolute;
-        bottom: -60px;
-        width: 100%;
-        text-align: center;
+        background-color: #003366;
         color: #fff;
+        text-align: center;
+        padding: 1rem 0;
         font-size: 0.9rem;
       }
       .select2-container--default .select2-selection--single {
-        height: 45px;
-        border-radius: 5px;
+        height: 50px;
+        border-radius: 8px;
         border: 1px solid #ced4da;
       }
       .select2-selection__rendered {
-        line-height: 45px;
+        line-height: 50px;
       }
       .select2-selection__arrow {
-        height: 45px;
+        height: 50px;
       }
       .btn-primary {
         background-color: #004080;
         border: none;
         transition: background-color 0.3s;
+        letter-spacing: 1px;
       }
       .btn-primary:hover {
         background-color: #003366;
@@ -437,8 +485,9 @@ dropdown_page = """
     </style>
   </head>
   <body>
-    <div class="dropdown-container">
+    <div class="content-wrapper">
       <form class="dropdown-form" method="post">
+        <img src="https://i.pinimg.com/736x/b1/ba/ab/b1baab2ab9b18dc74d8a925f036dd598.jpg" alt="Marsh McLennan Logo" class="logo">
         <div class="app-title">StatementFlow</div>
         <h2 class="text-center mb-4">Select Insurer</h2>
         <div class="form-group">
@@ -452,11 +501,11 @@ dropdown_page = """
         <div class="form-group text-center">
           <button type="submit" class="btn btn-primary btn-block">Process</button>
         </div>
-        <div class="footer">
-          &copy; {{ current_year }} StatementFlow. All rights reserved. Powered by Relentless.AI
-        </div>
       </form>
     </div>
+    <footer class="footer">
+      &copy; {{ current_year }} StatementFlow. All rights reserved. Powered by Relentless.AI
+    </footer>
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <!-- Select2 JS -->
@@ -492,56 +541,69 @@ mapping_page = """
       body {
         background: linear-gradient(135deg, #004080, #c8c8ff);
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color: #333;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
       }
-      .mapping-container {
+      .content-wrapper {
+        flex: 1;
         display: flex;
         justify-content: center;
         align-items: center;
-        min-height: 100vh;
         padding: 2rem;
       }
       .mapping-form {
         background: rgba(255, 255, 255, 0.95);
-        padding: 3rem;
-        border-radius: 12px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        padding: 4rem 5rem;
+        border-radius: 16px;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
         width: 100%;
-        max-width: 800px;
-        position: relative;
+        max-width: 900px;
+        transition: transform 0.3s ease;
+      }
+      .mapping-form:hover {
+        transform: translateY(-5px);
       }
       .app-title {
         text-align: center;
-        font-size: 1.5rem;
+        font-size: 2rem;
         margin-bottom: 1rem;
         color: #004080;
         font-weight: bold;
+        letter-spacing: 2px;
+      }
+      .footer {
+        background-color: #003366;
+        color: #fff;
+        text-align: center;
+        padding: 1rem 0;
+        font-size: 0.9rem;
       }
       .mapping-form-content {
-        max-height: 60vh;
+        max-height: 70vh;
         overflow-y: auto;
-        margin-bottom: 1.5rem;
+        margin-bottom: 2rem;
+        padding: 1rem;
+        border: 1px solid #ced4da;
+        border-radius: 8px;
+        background-color: #f8f9fa;
       }
       .constant-label {
         background-color: #e9ecef;
         padding: 0.75rem;
-        border-radius: 5px;
+        border-radius: 8px;
         display: inline-block;
         width: 100%;
         text-align: left;
         font-weight: bold;
-      }
-      .footer {
-        position: absolute;
-        bottom: -60px;
-        width: 100%;
-        text-align: center;
-        color: #fff;
-        font-size: 0.9rem;
+        box-shadow: inset 0 0 5px rgba(0,0,0,0.1);
       }
       .btn-primary {
         background-color: #004080;
         border: none;
         transition: background-color 0.3s;
+        letter-spacing: 1px;
       }
       .btn-primary:hover {
         background-color: #003366;
@@ -551,13 +613,16 @@ mapping_page = """
         color: #333;
       }
       select.form-control {
-        border-radius: 5px;
+        border-radius: 8px;
         border: 1px solid #ced4da;
+      }
+      .form-group.row {
+        align-items: center;
       }
     </style>
   </head>
   <body>
-    <div class="mapping-container">
+    <div class="content-wrapper">
       <form class="mapping-form" method="post">
         <div class="app-title">StatementFlow</div>
         <h2 class="text-center mb-4">Edit Column Mapping</h2>
@@ -586,14 +651,17 @@ mapping_page = """
         <div class="form-group text-center">
           <button type="submit" class="btn btn-primary btn-block">Process</button>
         </div>
-        <div class="footer">
-          &copy; {{ current_year }} StatementFlow. All rights reserved. Powered by Relentless.AI
-        </div>
       </form>
     </div>
+    <footer class="footer">
+      &copy; {{ current_year }} StatementFlow. All rights reserved. Powered by Relentless.AI
+    </footer>
   </body>
 </html>
 """
+
+
+
 
 
 @app.route('/', methods=['GET', 'POST'])
