@@ -13080,12 +13080,7 @@ def process_manipal_health_insurance_company(file_path, template_data, risk_code
                 print("'Endorsement No.' not in processed data, setting 'P & L JV' to empty.")
 
             # Remove rows where both 'Premium' and 'Brokerage' are 0
-            if 'Premium' in processed_df.columns and 'Brokerage' in processed_df.columns:
-                processed_df[['Premium', 'Brokerage']] = processed_df[['Premium', 'Brokerage']].apply(pd.to_numeric, errors='coerce').fillna(0)
-                processed_df = processed_df[~((processed_df['Premium'] == 0) & (processed_df['Brokerage'] == 0))]
-                print("Removed rows where both 'Premium' and 'Brokerage' are 0.")
-            else:
-                print("'Premium' or 'Brokerage' column not in processed data.")
+
 
             # Ensure numeric columns are handled correctly after mappings
             numeric_columns = ['Premium', 'Brokerage']
@@ -13114,6 +13109,8 @@ def process_manipal_health_insurance_company(file_path, template_data, risk_code
                 processed_df['Brokerage Rate'] = processed_df['Brokerage Rate'].apply(lambda x: "{0:.2f}".format(x))
             else:
                 print("'Premium' or 'Brokerage' column not in processed data, cannot calculate 'Brokerage Rate'.")
+
+            processed_df[['Brokerage', 'Premium']] = processed_df[['Brokerage', 'Premium']].round(2)
 
             # 'Income Category' comes from mappings
             if 'Income category' in processed_df.columns:
