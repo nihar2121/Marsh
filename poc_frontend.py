@@ -23,61 +23,85 @@ login_page = """
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
-    <title>Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>StatementFlow - Login</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
     <style>
+      body {
+        font-family: 'Roboto', sans-serif;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        height: 100vh;
+        margin: 0;
+      }
       .login-container {
         display: flex;
         justify-content: center;
         align-items: center;
-        height: 100vh;
-        background: linear-gradient(180deg, #004080, #c8c8ff);
+        height: calc(100vh - 56px); /* Adjust for navbar height */
       }
       .login-form {
         background: white;
-        padding: 2rem;
-        border-radius: 8px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        padding: 2.5rem;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         width: 100%;
         max-width: 400px;
       }
       .logo {
-        width: 150px;
+        width: 120px;
         display: block;
-        margin: 0 auto 1rem;
+        margin: 0 auto 1.5rem;
       }
-      input {
-        width: 100%;
+      .btn-primary {
+        background-color: #1e3c72;
+        border: none;
       }
-      .alert {
-        margin-top: 1rem;
+      .btn-primary:hover {
+        background-color: #2a5298;
+      }
+      .navbar-brand {
+        font-weight: 500;
+        font-size: 1.5rem;
       }
     </style>
   </head>
   <body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <div class="container">
+        <a class="navbar-brand" href="#">StatementFlow</a>
+      </div>
+    </nav>
+
+    <!-- Login Form -->
     <div class="login-container">
       <form class="login-form" method="post">
-        <img src="https://i.pinimg.com/736x/b1/ba/ab/b1baab2ab9b18dc74d8a925f036dd598.jpg" alt="Marsh McLennan Logo" class="logo">
-        <h2 class="text-center">Login Page</h2>
+        <img src="https://i.pinimg.com/736x/b1/ba/ab/b1baab2ab9b18dc74d8a925f036dd598.jpg" alt="StatementFlow Logo" class="logo">
+        <h3 class="text-center mb-4">Welcome to StatementFlow</h3>
         {% if error %}
           <div class="alert alert-danger" role="alert">
             {{ error }}
           </div>
         {% endif %}
-        <div class="form-group">
-          <label for="username">Username:</label>
-          <input type="text" id="username" name="username" class="form-control">
+        <div class="mb-3">
+          <label for="username" class="form-label">Username:</label>
+          <input type="text" id="username" name="username" class="form-control" required>
         </div>
-        <div class="form-group">
-          <label for="password">Password:</label>
-          <input type="password" id="password" name="password" class="form-control">
+        <div class="mb-4">
+          <label for="password" class="form-label">Password:</label>
+          <input type="password" id="password" name="password" class="form-control" required>
         </div>
-        <div class="form-group text-center">
+        <div class="d-grid">
           <button type="submit" class="btn btn-primary">Login</button>
         </div>
       </form>
     </div>
+
+    <!-- Bootstrap 5 JS and dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   </body>
 </html>
 """
