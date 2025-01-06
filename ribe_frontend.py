@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify, session
+from flask import Flask, render_template, request, redirect, url_for, send_file, session
 import os
 import pandas as pd
 from werkzeug.utils import secure_filename
@@ -11,7 +11,7 @@ from jinja2 import DictLoader
 from ribe_backend import process_file
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'  # Replace with a secure secret key
+app.secret_key = 'your_secure_secret_key'  # Replace with a secure, randomly generated secret key
 
 # Configuration for file uploads
 UPLOAD_FOLDER = 'uploads'
@@ -20,6 +20,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # HTML Templates
+
 base_template = """
 <!doctype html>
 <html lang="en">
@@ -168,9 +169,16 @@ template_dict = {
 
 app.jinja_loader = DictLoader(template_dict)
 
-# Helper Functions
-
 def allowed_file(filename):
+    """
+    Checks if the uploaded file has an allowed extension.
+
+    Args:
+        filename (str): Name of the uploaded file.
+
+    Returns:
+        bool: True if allowed, False otherwise.
+    """
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -178,12 +186,18 @@ def allowed_file(filename):
 
 @app.route('/', methods=['GET', 'POST'])
 def login():
+    """
+    Handles user login.
+
+    GET: Renders the login page.
+    POST: Validates credentials and redirects to file upload if successful.
+    """
     error = None
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        # Updated password to 'nihar21'
-        if (username == 'piyush' and password == 'nihar21'):
+        # Credentials check (update as needed)
+        if username == 'piyush' and password == 'nihar21':
             session['username'] = username
             return redirect(url_for('browse_files'))
         else:
@@ -192,6 +206,12 @@ def login():
 
 @app.route('/browse', methods=['GET', 'POST'])
 def browse_files():
+    """
+    Handles file upload and processing.
+
+    GET: Renders the file upload page.
+    POST: Processes the uploaded file and provides the final output for download.
+    """
     if 'username' not in session:
         return redirect(url_for('login'))
 
@@ -203,7 +223,7 @@ def browse_files():
             error = 'No file part in the request.'
             return render_template('browse.html', message=message, error=error, 
                                    title="Browse Files", current_year=datetime.now().year)
-        
+
         file = request.files['file']
 
         if file.filename == '':
@@ -216,24 +236,37 @@ def browse_files():
             save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(save_path)
 
-            # --- Now call our backend processing function ---
-            processed_file_path = process_file(save_path)
+            try:
+                # Call the backend processing function
+                final_output_path = process_file(save_path)
 
-            # Return the processed file with the new 'Category' column
-            return send_file(processed_file_path, as_attachment=True)
+                # Optionally, you can add a success message
+                message = f'File "{filename}" uploaded and processed successfully.'
+
+                # Return the processed file for download
+                return send_file(final_output_path, as_attachment=True)
+
+            except Exception as e:
+                error = f'An error occurred during processing: {str(e)}'
         else:
             error = 'Unsupported file type. Please upload a CSV or Excel file.'
-    
+
     return render_template('browse.html', message=message, error=error, 
                            title="Browse Files", current_year=datetime.now().year)
 
 @app.route('/logout')
 def logout():
+    """
+    Logs out the user by clearing the session.
+    """
     session.pop('username', None)
     return redirect(url_for('login'))
 
 def run_app():
-    app.run(port=5001, debug=False)  # Changed port to avoid conflict if another app is running
+    """
+    Runs the Flask app on port 5001.
+    """
+    app.run(port=5001, debug=False)  # Change port if needed
 
 if __name__ == '__main__':
     threading.Thread(target=run_app).start()
