@@ -7,6 +7,9 @@ import threading
 import webbrowser
 from jinja2 import DictLoader
 
+# --- IMPORTANT: Import the backend processing function ---
+from ribe_backend import process_file
+
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # Replace with a secure secret key
 
@@ -17,7 +20,6 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # HTML Templates
-
 base_template = """
 <!doctype html>
 <html lang="en">
@@ -199,29 +201,31 @@ def browse_files():
     if request.method == 'POST':
         if 'file' not in request.files:
             error = 'No file part in the request.'
-            return render_template('browse.html', message=message, error=error, title="Browse Files", current_year=datetime.now().year)
+            return render_template('browse.html', message=message, error=error, 
+                                   title="Browse Files", current_year=datetime.now().year)
         
         file = request.files['file']
 
         if file.filename == '':
             error = 'No file selected.'
-            return render_template('browse.html', message=message, error=error, title="Browse Files", current_year=datetime.now().year)
+            return render_template('browse.html', message=message, error=error, 
+                                   title="Browse Files", current_year=datetime.now().year)
 
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(save_path)
 
-            # Placeholder for backend processing
-            # You can call your backend processing function here
-            # For now, we'll just return the same file
+            # --- Now call our backend processing function ---
+            processed_file_path = process_file(save_path)
 
-            message = f'File "{filename}" uploaded successfully.'
-            return send_file(save_path, as_attachment=True)
+            # Return the processed file with the new 'Category' column
+            return send_file(processed_file_path, as_attachment=True)
         else:
             error = 'Unsupported file type. Please upload a CSV or Excel file.'
     
-    return render_template('browse.html', message=message, error=error, title="Browse Files", current_year=datetime.now().year)
+    return render_template('browse.html', message=message, error=error, 
+                           title="Browse Files", current_year=datetime.now().year)
 
 @app.route('/logout')
 def logout():
@@ -229,7 +233,7 @@ def logout():
     return redirect(url_for('login'))
 
 def run_app():
-    app.run(port=5001, debug=False)  # Changed port to avoid conflict if original app is running
+    app.run(port=5001, debug=False)  # Changed port to avoid conflict if another app is running
 
 if __name__ == '__main__':
     threading.Thread(target=run_app).start()
