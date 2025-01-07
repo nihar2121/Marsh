@@ -224,12 +224,12 @@ def process_file(filepath):
                 'NatureofTransaction': 'Contra'
             }
 
-            # Negative entry: Bank Account
+            # Negative entry: G/L Account
             negative_entry = {
                 'EntryNo': entry_no + 1,
                 'DocumentNo': document_no,
                 'LineNo': 2,
-                'AccountType': 'Bank Account',
+                'AccountType': 'G/L Account',
                 'AccountNo': 1500001,
                 'PostingDate': posting_date,
                 'Amount': -debit_amt_positive,
@@ -258,24 +258,14 @@ def process_file(filepath):
     # Get all columns from sample_entries template
     sample_columns = sample_df.columns.tolist()
 
-    # Create a DataFrame with sample_columns and populate with processed_df
-    final_df = pd.DataFrame(columns=sample_columns)
+    # Create a list of dictionaries matching the sample_columns
+    final_entries = []
+    for entry in processed_entries:
+        final_entry = {col: entry.get(col, '') for col in sample_columns}
+        final_entries.append(final_entry)
 
-    # Fill only the required columns, others remain blank
-    required_output_columns = [
-        'EntryNo', 'DocumentNo', 'LineNo', 'AccountType', 'AccountNo',
-        'PostingDate', 'Amount', 'Narration', 'NatureofTransaction'
-    ]
-
-    # Populate final_df
-    for _, row in processed_df.iterrows():
-        entry = {}
-        for col in sample_columns:
-            if col in required_output_columns:
-                entry[col] = row[col]
-            else:
-                entry[col] = ''  # or pd.NA
-        final_df = final_df.append(entry, ignore_index=True)
+    # Create the final DataFrame
+    final_df = pd.DataFrame(final_entries, columns=sample_columns)
 
     # Define the output path
     base_dir, _ = os.path.split(filepath)
