@@ -1,12 +1,13 @@
 # ribe_backend.py
 import pandas as pd
-import re
 import os
+from datetime import datetime
 
 def process_file(filepath):
     """
     Processes the uploaded transaction file, categorizes transactions,
-    and generates a final output file based on 'Receipt' categories.
+    and generates a final output file based on 'Receipt', 'Payment',
+    'Bank Charges', and 'Brokerage Transfer' categories.
 
     Args:
         filepath (str): Path to the uploaded transaction file (CSV or Excel).
@@ -67,14 +68,14 @@ def process_file(filepath):
     # Create the Category column
     df["Category"] = df.apply(assign_category, axis=1)
 
-    # Now, proceed to process 'Receipt' category
-    receipt_df = df[df["Category"] == "Receipt"]
+    # Initialize counters for DocumentNo
+    br_counter = 1  # For Bank Receipts
+    bp_counter = 1  # For Bank Payments, Bank Charges, Brokerage Transfers
 
-    if receipt_df.empty:
-        raise ValueError("No 'Receipt' category transactions found in the uploaded file.")
+    # Initialize EntryNo
+    entry_no = 1
 
     # Load the sample entries template
-    # Update this path as per your actual location or make it relative to the app directory
     sample_entries_path = r"C:\Users\nilut\Desktop\Marsh&mclanen\Marsh\Marsh\uploads\Sample Entries (1).xlsx"
     
     # Check if the sample entries file exists
@@ -85,76 +86,189 @@ def process_file(filepath):
     sample_df = pd.read_excel(sample_entries_path)
 
     # Initialize list to collect new entries
-    new_entries = []
+    processed_entries = []
 
-    # Initialize EntryNo
-    entry_no = 1
-
-    # Iterate through receipt_df and add two rows per receipt
-    for index, row in receipt_df.iterrows():
-        date = row['DATE']
+    # Iterate through each row in the DataFrame
+    for index, row in df.iterrows():
+        category = row['Category']
         description = row['DESCRIPTION']
+        debit_amt = row['DEBIT AMT']
         credit_amt = row['CREDIT AMT']
+        date = row['DATE']
 
-        # Format date as per sample entries 'PostingDate' column
-        # Ensure 'DATE' is in a date format
-        if not pd.isnull(date):
+        # Parse date to extract month abbreviation
+        if pd.notna(date):
             if isinstance(date, str):
                 try:
-                    posting_date = pd.to_datetime(date, dayfirst=True).date()
-                except:
-                    posting_date = date
+                    date_parsed = datetime.strptime(date, '%d.%b %Y')  # Assuming format '02.NOV 2024'
+                except ValueError:
+                    try:
+                        date_parsed = pd.to_datetime(date, dayfirst=True)
+                    except:
+                        date_parsed = None
             elif isinstance(date, pd.Timestamp):
-                posting_date = date.date()
+                date_parsed = date
+            elif isinstance(date, datetime):
+                date_parsed = date
             else:
-                posting_date = date
+                date_parsed = None
         else:
+            date_parsed = None
+
+        if date_parsed:
+            month_abbr = date_parsed.strftime('%b')
+            posting_date = date_parsed.strftime('%Y-%m-%d')  # For Excel date formatting
+        else:
+            month_abbr = 'Unknown'
             posting_date = ''
 
-        # Create positive entry
-        positive_entry = {
-            'EntryNo': entry_no,
-            'LineNo': 1,
-            'AccountType': 'Bank Account',
-            'AccountNo': 2600005,
-            'PostingDate': posting_date,
-            'Amount': credit_amt,
-            'Narration': description,
-            'NatureofTransaction': 'Bank Receipt'
-        }
+        if category == "Receipt":
+            # DocumentNo: CITI/013/BR/Nov/001
+            doc_prefix = "BR"
+            document_no = f"CITI/013/{doc_prefix}/{month_abbr}/{br_counter:03d}"
 
-        # Create negative entry
-        negative_entry = {
-            'EntryNo': entry_no,
-            'LineNo': 2,
-            'AccountType': 'G/L Account',
-            'AccountNo': 1500001,
-            'PostingDate': posting_date,
-            'Amount': -credit_amt,
-            'Narration': description,
-            'NatureofTransaction': 'Bank Receipt'
-        }
+            # Positive entry: Bank Account
+            positive_entry = {
+                'EntryNo': entry_no,
+                'DocumentNo': document_no,
+                'LineNo': 1,
+                'AccountType': 'Bank Account',
+                'AccountNo': 2600005,
+                'PostingDate': posting_date,
+                'Amount': credit_amt,
+                'Narration': description,
+                'NatureofTransaction': 'Bank Receipt'
+            }
 
-        # Append the entries to new_entries list
-        new_entries.append(positive_entry)
-        new_entries.append(negative_entry)
+            # Negative entry: G/L Account
+            negative_entry = {
+                'EntryNo': entry_no + 1,
+                'DocumentNo': document_no,
+                'LineNo': 2,
+                'AccountType': 'G/L Account',
+                'AccountNo': 1500001,
+                'PostingDate': posting_date,
+                'Amount': -credit_amt,
+                'Narration': description,
+                'NatureofTransaction': 'Bank Receipt'
+            }
 
-        # Increment entry_no for the next set of entries
-        entry_no += 1
+            # Append the entries to processed_entries list
+            processed_entries.append(positive_entry)
+            processed_entries.append(negative_entry)
 
-    # Create DataFrame from new_entries
-    new_entries_df = pd.DataFrame(new_entries)
+            # Increment counters
+            br_counter += 1
+            entry_no += 2
+
+        elif category in ["Payment", "Bank Charges"]:
+            # DocumentNo: CITI/013/BP/Nov/001
+            doc_prefix = "BP"
+            document_no = f"CITI/013/{doc_prefix}/{month_abbr}/{bp_counter:03d}"
+
+            # Ensure debit_amt is positive
+            debit_amt_positive = abs(debit_amt) if pd.notna(debit_amt) else 0
+
+            # Positive entry: G/L Account
+            positive_entry = {
+                'EntryNo': entry_no,
+                'DocumentNo': document_no,
+                'LineNo': 1,
+                'AccountType': 'G/L Account',
+                'AccountNo': 1500001,
+                'PostingDate': posting_date,
+                'Amount': debit_amt_positive,
+                'Narration': description,
+                'NatureofTransaction': 'Bank Payment'
+            }
+
+            # Negative entry: Bank Account
+            negative_entry = {
+                'EntryNo': entry_no + 1,
+                'DocumentNo': document_no,
+                'LineNo': 2,
+                'AccountType': 'Bank Account',
+                'AccountNo': 2600005,
+                'PostingDate': posting_date,
+                'Amount': -debit_amt_positive,
+                'Narration': description,
+                'NatureofTransaction': 'Bank Payment'
+            }
+
+            # Append the entries to processed_entries list
+            processed_entries.append(positive_entry)
+            processed_entries.append(negative_entry)
+
+            # Increment counters
+            bp_counter += 1
+            entry_no += 2
+
+        elif category == "Brokerage Transfer":
+            # DocumentNo: CITI/013/BP/Nov/001
+            doc_prefix = "BP"
+            document_no = f"CITI/013/{doc_prefix}/{month_abbr}/{bp_counter:03d}"
+
+            # Ensure debit_amt is positive
+            debit_amt_positive = abs(debit_amt) if pd.notna(debit_amt) else 0
+
+            # Positive entry: Bank Account
+            positive_entry = {
+                'EntryNo': entry_no,
+                'DocumentNo': document_no,
+                'LineNo': 1,
+                'AccountType': 'Bank Account',
+                'AccountNo': 2600005,
+                'PostingDate': posting_date,
+                'Amount': debit_amt_positive,
+                'Narration': description,
+                'NatureofTransaction': 'Contra'
+            }
+
+            # Negative entry: Bank Account
+            negative_entry = {
+                'EntryNo': entry_no + 1,
+                'DocumentNo': document_no,
+                'LineNo': 2,
+                'AccountType': 'Bank Account',
+                'AccountNo': 1500001,
+                'PostingDate': posting_date,
+                'Amount': -debit_amt_positive,
+                'Narration': description,
+                'NatureofTransaction': 'Contra'
+            }
+
+            # Append the entries to processed_entries list
+            processed_entries.append(positive_entry)
+            processed_entries.append(negative_entry)
+
+            # Increment counters
+            bp_counter += 1
+            entry_no += 2
+
+        else:
+            # Ignore other categories or handle them as needed
+            continue
+
+    if not processed_entries:
+        raise ValueError("No relevant transactions to process.")
+
+    # Create DataFrame from processed_entries
+    processed_df = pd.DataFrame(processed_entries)
 
     # Get all columns from sample_entries template
     sample_columns = sample_df.columns.tolist()
 
-    # Create a DataFrame with sample_columns and populate with new_entries_df
+    # Create a DataFrame with sample_columns and populate with processed_df
     final_df = pd.DataFrame(columns=sample_columns)
 
     # Fill only the required columns, others remain blank
-    required_output_columns = ['EntryNo', 'LineNo', 'AccountType', 'AccountNo', 'PostingDate', 'Amount', 'Narration', 'NatureofTransaction']
-    
-    for index, row in new_entries_df.iterrows():
+    required_output_columns = [
+        'EntryNo', 'DocumentNo', 'LineNo', 'AccountType', 'AccountNo',
+        'PostingDate', 'Amount', 'Narration', 'NatureofTransaction'
+    ]
+
+    # Populate final_df
+    for _, row in processed_df.iterrows():
         entry = {}
         for col in sample_columns:
             if col in required_output_columns:
@@ -166,7 +280,7 @@ def process_file(filepath):
     # Define the output path
     base_dir, _ = os.path.split(filepath)
     output_path = os.path.join(base_dir, "Final_Output.xlsx")
-    
+
     # Write to Excel with formatting using xlsxwriter
     with pd.ExcelWriter(output_path, engine='xlsxwriter') as writer:
         final_df.to_excel(writer, index=False, sheet_name='Sheet1')
@@ -180,7 +294,7 @@ def process_file(filepath):
         # Apply formats to 'Amount' and 'PostingDate' columns
         if 'Amount' in sample_columns:
             amount_col_idx = sample_columns.index('Amount')
-            # Columns are zero-indexed
+            # Columns are zero-indexed; set width and format
             worksheet.set_column(amount_col_idx, amount_col_idx, 15, money_fmt)
         
         if 'PostingDate' in sample_columns:
