@@ -76,7 +76,7 @@ def process_file(filepath):
     entry_no = 1
 
     # Load the sample entries template
-    sample_entries_path = r"C:\Users\nilut\Desktop\Marsh&mclanen\Marsh\Marsh\uploads\Sample Entries (1).xlsx"
+    sample_entries_path = r"\\?\UNC\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller\Common folder AP & AR\Brokerage Statement Automation\RI Entries\Sample Entries (1).xlsx"
     
     # Check if the sample entries file exists
     if not os.path.exists(sample_entries_path):
