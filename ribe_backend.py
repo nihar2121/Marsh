@@ -1,6 +1,7 @@
 # ribe_backend.py
 import pandas as pd
 import os
+import re
 from datetime import datetime
 
 def process_file(filepath):
@@ -85,8 +86,41 @@ def process_file(filepath):
     # Load the sample entries as a DataFrame
     sample_df = pd.read_excel(sample_entries_path)
 
+    # Define the Output Files directories
+    ri_entries_dir = os.path.dirname(sample_entries_path)
+    output_files_dir = os.path.join(ri_entries_dir, "Output Files")
+    single_files_dir = os.path.join(output_files_dir, "Single Files")
+    master_file_dir = os.path.join(output_files_dir, "Master File")
+
+    # Create directories if they don't exist
+    os.makedirs(single_files_dir, exist_ok=True)
+    os.makedirs(master_file_dir, exist_ok=True)
+
+    # Define Master File path
+    master_file_path = os.path.join(master_file_dir, "Master_File.xlsx")
+
+    # Load Master File if it exists, else create an empty DataFrame with required columns
+    if os.path.exists(master_file_path):
+        master_df = pd.read_excel(master_file_path)
+    else:
+        # Initialize an empty DataFrame with the same columns as sample_df
+        master_df = pd.DataFrame(columns=sample_df.columns.tolist())
+
+    # Extract prefix from the file name
+    filename = os.path.basename(filepath)
+    filename_lower = filename.lower()
+    match = re.match(r'^(citi\d{3})', filename_lower)
+    if match:
+        prefix_raw = match.group(1)
+        prefix_formatted = f"{prefix_raw[:4].upper()}/{prefix_raw[4:]}"  # 'citi013' → 'CITI/013'
+    else:
+        raise ValueError("Filename does not start with a valid prefix (e.g., 'citi013').")
+
     # Initialize list to collect new entries
     processed_entries = []
+
+    # Prepare a set of existing narrations for quick lookup
+    existing_narrations = set(master_df['Narration'].str.lower().str.strip()) if not master_df.empty else set()
 
     # Iterate through each row in the DataFrame
     for index, row in df.iterrows():
@@ -95,6 +129,11 @@ def process_file(filepath):
         debit_amt = row['DEBIT AMT']
         credit_amt = row['CREDIT AMT']
         date = row['DATE']
+
+        # Check if description already exists in master narrations
+        if pd.isna(description) or description.lower().strip() in existing_narrations:
+            # Skip processing this row
+            continue
 
         # Parse date to extract month abbreviation
         if pd.notna(date):
@@ -123,9 +162,9 @@ def process_file(filepath):
             posting_date = ''
 
         if category == "Receipt":
-            # DocumentNo: CITI/013/BR/Nov/001
+            # DocumentNo: {prefix}/BR/{Month}/Counter
             doc_prefix = "BR"
-            document_no = f"CITI/013/{doc_prefix}/{month_abbr}/{br_counter:03d}"
+            document_no = f"{prefix_formatted}/{doc_prefix}/{month_abbr}/{br_counter:03d}"
 
             # Positive entry: Bank Account
             positive_entry = {
@@ -137,7 +176,42 @@ def process_file(filepath):
                 'PostingDate': posting_date,
                 'Amount': credit_amt,
                 'Narration': description,
-                'NatureofTransaction': 'Bank Receipt'
+                'NatureofTransaction': 'Bank Receipt',
+                # Fill other columns with empty strings
+                'ReceiptType': '',
+                'CurrencyCode': '',
+                'CurrencyRate': '',
+                'ExternalDocumentNo': '',
+                'BranchDimensionCode': '',
+                'CoverNo': '',
+                'InsuranceBranch': '',
+                'MarshBranch': '',
+                'Department': '',
+                'ServicerID': '',
+                'CE Name': '',
+                'ClientName': '',
+                'PolicyNo': '',
+                'EndorsementNo': '',
+                'Risk': '',
+                'ASP_PRACTICE': '',
+                'IncomeCategory': '',
+                'PolInceptionDate': '',
+                'Pol.End Dt.': '',
+                'Premium': '',
+                'Premium GST': '',
+                'BrokerageRate': '',
+                'INSURER_TYPE': '',
+                'INSURER_NAME': '',
+                'PROPORTION': '',
+                'BRIEF_DESC': '',
+                'Curr.': '',
+                'Curr_Rate': '',
+                'BROKERAGE_FEE_DUE': '',
+                'iTrack No.': '',
+                'FinanceSPOC': '',
+                'Grouping': '',
+                'Due Date': '',
+                'Overdue': ''
             }
 
             # Negative entry: G/L Account
@@ -150,7 +224,42 @@ def process_file(filepath):
                 'PostingDate': posting_date,
                 'Amount': -credit_amt,
                 'Narration': description,
-                'NatureofTransaction': 'Bank Receipt'
+                'NatureofTransaction': 'Bank Receipt',
+                # Fill other columns with empty strings
+                'ReceiptType': '',
+                'CurrencyCode': '',
+                'CurrencyRate': '',
+                'ExternalDocumentNo': '',
+                'BranchDimensionCode': '',
+                'CoverNo': '',
+                'InsuranceBranch': '',
+                'MarshBranch': '',
+                'Department': '',
+                'ServicerID': '',
+                'CE Name': '',
+                'ClientName': '',
+                'PolicyNo': '',
+                'EndorsementNo': '',
+                'Risk': '',
+                'ASP_PRACTICE': '',
+                'IncomeCategory': '',
+                'PolInceptionDate': '',
+                'Pol.End Dt.': '',
+                'Premium': '',
+                'Premium GST': '',
+                'BrokerageRate': '',
+                'INSURER_TYPE': '',
+                'INSURER_NAME': '',
+                'PROPORTION': '',
+                'BRIEF_DESC': '',
+                'Curr.': '',
+                'Curr_Rate': '',
+                'BROKERAGE_FEE_DUE': '',
+                'iTrack No.': '',
+                'FinanceSPOC': '',
+                'Grouping': '',
+                'Due Date': '',
+                'Overdue': ''
             }
 
             # Append the entries to processed_entries list
@@ -162,9 +271,9 @@ def process_file(filepath):
             entry_no += 2
 
         elif category in ["Payment", "Bank Charges"]:
-            # DocumentNo: CITI/013/BP/Nov/001
+            # DocumentNo: {prefix}/BP/{Month}/Counter
             doc_prefix = "BP"
-            document_no = f"CITI/013/{doc_prefix}/{month_abbr}/{bp_counter:03d}"
+            document_no = f"{prefix_formatted}/{doc_prefix}/{month_abbr}/{bp_counter:03d}"
 
             # Ensure debit_amt is positive
             debit_amt_positive = abs(debit_amt) if pd.notna(debit_amt) else 0
@@ -179,7 +288,42 @@ def process_file(filepath):
                 'PostingDate': posting_date,
                 'Amount': debit_amt_positive,
                 'Narration': description,
-                'NatureofTransaction': 'Bank Payment'
+                'NatureofTransaction': 'Bank Payment',
+                # Fill other columns with empty strings
+                'ReceiptType': '',
+                'CurrencyCode': '',
+                'CurrencyRate': '',
+                'ExternalDocumentNo': '',
+                'BranchDimensionCode': '',
+                'CoverNo': '',
+                'InsuranceBranch': '',
+                'MarshBranch': '',
+                'Department': '',
+                'ServicerID': '',
+                'CE Name': '',
+                'ClientName': '',
+                'PolicyNo': '',
+                'EndorsementNo': '',
+                'Risk': '',
+                'ASP_PRACTICE': '',
+                'IncomeCategory': '',
+                'PolInceptionDate': '',
+                'Pol.End Dt.': '',
+                'Premium': '',
+                'Premium GST': '',
+                'BrokerageRate': '',
+                'INSURER_TYPE': '',
+                'INSURER_NAME': '',
+                'PROPORTION': '',
+                'BRIEF_DESC': '',
+                'Curr.': '',
+                'Curr_Rate': '',
+                'BROKERAGE_FEE_DUE': '',
+                'iTrack No.': '',
+                'FinanceSPOC': '',
+                'Grouping': '',
+                'Due Date': '',
+                'Overdue': ''
             }
 
             # Negative entry: Bank Account
@@ -192,7 +336,42 @@ def process_file(filepath):
                 'PostingDate': posting_date,
                 'Amount': -debit_amt_positive,
                 'Narration': description,
-                'NatureofTransaction': 'Bank Payment'
+                'NatureofTransaction': 'Bank Payment',
+                # Fill other columns with empty strings
+                'ReceiptType': '',
+                'CurrencyCode': '',
+                'CurrencyRate': '',
+                'ExternalDocumentNo': '',
+                'BranchDimensionCode': '',
+                'CoverNo': '',
+                'InsuranceBranch': '',
+                'MarshBranch': '',
+                'Department': '',
+                'ServicerID': '',
+                'CE Name': '',
+                'ClientName': '',
+                'PolicyNo': '',
+                'EndorsementNo': '',
+                'Risk': '',
+                'ASP_PRACTICE': '',
+                'IncomeCategory': '',
+                'PolInceptionDate': '',
+                'Pol.End Dt.': '',
+                'Premium': '',
+                'Premium GST': '',
+                'BrokerageRate': '',
+                'INSURER_TYPE': '',
+                'INSURER_NAME': '',
+                'PROPORTION': '',
+                'BRIEF_DESC': '',
+                'Curr.': '',
+                'Curr_Rate': '',
+                'BROKERAGE_FEE_DUE': '',
+                'iTrack No.': '',
+                'FinanceSPOC': '',
+                'Grouping': '',
+                'Due Date': '',
+                'Overdue': ''
             }
 
             # Append the entries to processed_entries list
@@ -204,9 +383,9 @@ def process_file(filepath):
             entry_no += 2
 
         elif category == "Brokerage Transfer":
-            # DocumentNo: CITI/013/BP/Nov/001
+            # DocumentNo: {prefix}/BP/{Month}/Counter
             doc_prefix = "BP"
-            document_no = f"CITI/013/{doc_prefix}/{month_abbr}/{bp_counter:03d}"
+            document_no = f"{prefix_formatted}/{doc_prefix}/{month_abbr}/{bp_counter:03d}"
 
             # Ensure debit_amt is positive
             debit_amt_positive = abs(debit_amt) if pd.notna(debit_amt) else 0
@@ -221,7 +400,42 @@ def process_file(filepath):
                 'PostingDate': posting_date,
                 'Amount': debit_amt_positive,
                 'Narration': description,
-                'NatureofTransaction': 'Contra'
+                'NatureofTransaction': 'Contra',
+                # Fill other columns with empty strings
+                'ReceiptType': '',
+                'CurrencyCode': '',
+                'CurrencyRate': '',
+                'ExternalDocumentNo': '',
+                'BranchDimensionCode': '',
+                'CoverNo': '',
+                'InsuranceBranch': '',
+                'MarshBranch': '',
+                'Department': '',
+                'ServicerID': '',
+                'CE Name': '',
+                'ClientName': '',
+                'PolicyNo': '',
+                'EndorsementNo': '',
+                'Risk': '',
+                'ASP_PRACTICE': '',
+                'IncomeCategory': '',
+                'PolInceptionDate': '',
+                'Pol.End Dt.': '',
+                'Premium': '',
+                'Premium GST': '',
+                'BrokerageRate': '',
+                'INSURER_TYPE': '',
+                'INSURER_NAME': '',
+                'PROPORTION': '',
+                'BRIEF_DESC': '',
+                'Curr.': '',
+                'Curr_Rate': '',
+                'BROKERAGE_FEE_DUE': '',
+                'iTrack No.': '',
+                'FinanceSPOC': '',
+                'Grouping': '',
+                'Due Date': '',
+                'Overdue': ''
             }
 
             # Negative entry: G/L Account
@@ -234,7 +448,42 @@ def process_file(filepath):
                 'PostingDate': posting_date,
                 'Amount': -debit_amt_positive,
                 'Narration': description,
-                'NatureofTransaction': 'Contra'
+                'NatureofTransaction': 'Contra',
+                # Fill other columns with empty strings
+                'ReceiptType': '',
+                'CurrencyCode': '',
+                'CurrencyRate': '',
+                'ExternalDocumentNo': '',
+                'BranchDimensionCode': '',
+                'CoverNo': '',
+                'InsuranceBranch': '',
+                'MarshBranch': '',
+                'Department': '',
+                'ServicerID': '',
+                'CE Name': '',
+                'ClientName': '',
+                'PolicyNo': '',
+                'EndorsementNo': '',
+                'Risk': '',
+                'ASP_PRACTICE': '',
+                'IncomeCategory': '',
+                'PolInceptionDate': '',
+                'Pol.End Dt.': '',
+                'Premium': '',
+                'Premium GST': '',
+                'BrokerageRate': '',
+                'INSURER_TYPE': '',
+                'INSURER_NAME': '',
+                'PROPORTION': '',
+                'BRIEF_DESC': '',
+                'Curr.': '',
+                'Curr_Rate': '',
+                'BROKERAGE_FEE_DUE': '',
+                'iTrack No.': '',
+                'FinanceSPOC': '',
+                'Grouping': '',
+                'Due Date': '',
+                'Overdue': ''
             }
 
             # Append the entries to processed_entries list
@@ -267,12 +516,13 @@ def process_file(filepath):
     # Create the final DataFrame
     final_df = pd.DataFrame(final_entries, columns=sample_columns)
 
-    # Define the output path
-    base_dir, _ = os.path.split(filepath)
-    output_path = os.path.join(base_dir, "Final_Output.xlsx")
+    # Save Single File
+    # Define the output path for Single Files
+    output_filename = f"Final_Output_{os.path.splitext(filename)[0]}.xlsx"
+    single_file_path = os.path.join(single_files_dir, output_filename)
 
     # Write to Excel with formatting using xlsxwriter
-    with pd.ExcelWriter(output_path, engine='xlsxwriter') as writer:
+    with pd.ExcelWriter(single_file_path, engine='xlsxwriter') as writer:
         final_df.to_excel(writer, index=False, sheet_name='Sheet1')
         workbook  = writer.book
         worksheet = writer.sheets['Sheet1']
@@ -291,4 +541,11 @@ def process_file(filepath):
             date_col_idx = sample_columns.index('PostingDate')
             worksheet.set_column(date_col_idx, date_col_idx, 15, date_fmt)
         
-    return output_path
+    # Append to Master File
+    # Append the new entries to master_df
+    master_df = pd.concat([master_df, final_df], ignore_index=True)
+
+    # Save Master File
+    master_df.to_excel(master_file_path, index=False, engine='xlsxwriter')
+
+    return single_file_path
