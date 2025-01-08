@@ -1185,86 +1185,104 @@ def process_united_india_insurance(file_path, template_data, risk_code_data, cus
         raise
 
 
-import os
-import pandas as pd
-import numpy as np
-from datetime import datetime
-
 def process_tata_aia_insurance(file_path, template_data, risk_code_data, cust_neft_data, table_3, table_4, table_5, subject, mappings):
     try:
-        # Read the file based on its extension, assuming the first row is the header
+        # ---------------------------------------------------------------------
+        # 1. Read the entire file with NO header so we can detect repeated headers
+        # ---------------------------------------------------------------------
         file_extension = os.path.splitext(file_path)[1].lower()
 
         if file_extension == '.xlsx':
-            data = pd.read_excel(file_path, header=0)
+            data = pd.read_excel(file_path, header=None)
         elif file_extension == '.xlsb':
-            data = pd.read_excel(file_path, engine='pyxlsb', header=0)
+            data = pd.read_excel(file_path, engine='pyxlsb', header=None)
         elif file_extension == '.csv':
-            data = pd.read_csv(file_path, header=0)
+            data = pd.read_csv(file_path, header=None)
         elif file_extension == '.ods':
-            data = pd.read_excel(file_path, engine='odf', header=0)
+            data = pd.read_excel(file_path, engine='odf', header=None)
         elif file_extension == '.txt':
-            data = pd.read_csv(file_path, delimiter='\t', header=0)
+            data = pd.read_csv(file_path, delimiter='\t', header=None)
         elif file_extension == '.xls':
-            data = pd.read_excel(file_path, engine='xlrd', header=0)
+            data = pd.read_excel(file_path, engine='xlrd', header=None)
         else:
             raise ValueError("Unsupported file format")
 
-        # Remove empty rows to avoid empty dataframes
-        data = data.dropna(how='all').reset_index(drop=True)
+        # Remove completely empty rows
+        data.dropna(how='all', inplace=True)
+        data.reset_index(drop=True, inplace=True)
 
-        # Remove rows with fewer than 5 non-NA cells
-        data = data[data.apply(lambda row: row.count() > 4, axis=1)].reset_index(drop=True)
+        # ---------------------------------------------------------------------
+        # 2. Identify all rows that look like "header rows"
+        #    i.e., contain "Insured Name", "Reference Kkey 1", "Segment" in that row
+        # ---------------------------------------------------------------------
+        header_indices = []
+        for idx, row in data.iterrows():
+            row_str = row.astype(str).str.lower()  # convert each cell to lowercase string
+            if (
+                row_str.str.contains('insured name', na=False).any() and
+                row_str.str.contains('reference kkey 1', na=False).any() and
+                row_str.str.contains('segment', na=False).any()
+            ):
+                header_indices.append(idx)
 
-        # Clean column names and data
-        data.columns = data.columns.str.strip()
-        data = data.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+        # If no repeated headers were found, we assume the entire file is one section
+        # But still push 0 as start and len(data) as end for normal logic
+        if len(header_indices) == 0:
+            header_indices = [0]
+        # Add the final row index + 1, so we can slice until the end
+        header_indices.append(len(data))
 
-        # Identify header rows based on the presence of key columns
-        # Assuming 'Client Name' and 'Premium' are key columns in the header
-        key_columns = ['Client Name', 'Premium', 'Brokerage']
-        header_indices = data.apply(lambda row: all(col in row.values for col in key_columns), axis=1)
-        header_rows = data[header_indices].index.tolist()
-
-        # If no repeated headers, process the entire dataframe as one section
-        if not header_rows:
-            header_rows = [0]
-
-        # Add the end index to capture the last section
-        header_rows.append(len(data))
-
+        # ---------------------------------------------------------------------
+        # 3. For each section, define the chunk and run the EXISTING TATA AIA logic
+        # ---------------------------------------------------------------------
         processed_dataframes = []
         excel_file_paths = []
-        csv_file_paths = []
 
-        # Iterate over each section identified by header rows
-        for i in range(len(header_rows) - 1):
-            start_idx = header_rows[i]
-            end_idx = header_rows[i + 1]
+        # We'll loop from 0 to len(header_indices)-1
+        for i in range(len(header_indices) - 1):
+            start_idx = header_indices[i]
+            end_idx = header_indices[i + 1]
 
-            # Extract the header row and the section data
-            header = data.iloc[start_idx]
-            section = data.iloc[start_idx + 1:end_idx].reset_index(drop=True)
+            # Slice the data for this section (excluding the header row for the actual data)
+            section_header_row = data.iloc[start_idx].values  # this becomes the columns
+            df_section = data.iloc[start_idx+1:end_idx].copy().reset_index(drop=True)
 
-            # Assign the header to the section dataframe
-            section.columns = header
+            # If df_section is empty, skip
+            if df_section.empty:
+                continue
 
-            # Remove empty rows in the section
-            section = section.dropna(how='all').reset_index(drop=True)
+            # Rename the columns using the header row
+            df_section.columns = section_header_row
 
-            # Further clean the section dataframe
-            section = section[section.apply(lambda row: row.count() > 4, axis=1)].reset_index(drop=True)
-            section.columns = section.columns.str.strip()
-            section = section.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+            # -----------------------------------------------------------------
+            # (A) Now everything below is the original TATA AIA logic,
+            #     but we do it for df_section instead of the entire file.
+            # -----------------------------------------------------------------
 
-            # Remove rows where only 'Comm' or 'Premium' column has data
-            if 'Comm' in section.columns and 'Premium' in section.columns:
-                section = section[~(((section['Comm'].notna()) & (section.drop(columns=['Comm']).isna().all(axis=1))) |
-                                    ((section['Premium'].notna()) & (section.drop(columns=['Premium']).isna().all(axis=1))))].reset_index(drop=True)
-            elif 'Comm' in section.columns:
-                section = section[~((section['Comm'].notna()) & (section.drop(columns=['Comm']).isna().all(axis=1)))].reset_index(drop=True)
-            elif 'Premium' in section.columns:
-                section = section[~((section['Premium'].notna()) & (section.drop(columns=['Premium']).isna().all(axis=1)))].reset_index(drop=True)
+            # 1) Remove empty rows to avoid empty dataframes
+            df_section = df_section.dropna(how='all').reset_index(drop=True)
+
+            # 2) Drop rows with fewer than 5 non-NA cells (like your original logic)
+            df_section = df_section[df_section.apply(lambda row: row.count() > 4, axis=1)].reset_index(drop=True)
+
+            # 3) Clean column names and data
+            df_section.columns = df_section.columns.str.strip()
+            df_section = df_section.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+
+            # 4) Remove rows where only 'Comm' or only 'Premium' has data
+            if 'Comm' in df_section.columns and 'Premium' in df_section.columns:
+                df_section = df_section[~(
+                    ((df_section['Comm'].notna()) & (df_section.drop(columns=['Comm']).isna().all(axis=1))) |
+                    ((df_section['Premium'].notna()) & (df_section.drop(columns=['Premium']).isna().all(axis=1)))
+                )].reset_index(drop=True)
+            elif 'Comm' in df_section.columns:
+                df_section = df_section[~(
+                    (df_section['Comm'].notna()) & (df_section.drop(columns=['Comm']).isna().all(axis=1))
+                )].reset_index(drop=True)
+            elif 'Premium' in df_section.columns:
+                df_section = df_section[~(
+                    (df_section['Premium'].notna()) & (df_section.drop(columns=['Premium']).isna().all(axis=1))
+                )].reset_index(drop=True)
 
             # Create a copy of the template_data
             processed_df = template_data.copy()
@@ -1272,8 +1290,8 @@ def process_tata_aia_insurance(file_path, template_data, risk_code_data, cust_ne
             # Process mappings from frontend (attachment columns on left, template columns on right)
             if mappings:
                 for attachment_col, template_col in mappings.items():
-                    if attachment_col in section.columns:
-                        processed_df[template_col] = section[attachment_col]
+                    if attachment_col in df_section.columns:
+                        processed_df[template_col] = df_section[attachment_col]
                     else:
                         processed_df[template_col] = ''
             else:
@@ -1306,108 +1324,119 @@ def process_tata_aia_insurance(file_path, template_data, risk_code_data, cust_ne
             numeric_columns = ['Premium', 'Brokerage Rate', 'Brokerage']
             for column in numeric_columns:
                 if column in processed_df.columns:
-                    processed_df[column] = processed_df[column].astype(str).str.replace(',', '').str.replace('(', '').str.replace(')', '')
+                    processed_df[column] = (
+                        processed_df[column].astype(str)
+                        .str.replace(',', '')
+                        .str.replace('(', '')
+                        .str.replace(')', '')
+                    )
                     processed_df[column] = pd.to_numeric(processed_df[column], errors='coerce').fillna(0)
                 else:
                     processed_df[column] = 0.00  # Ensure numeric zero
 
-            # Calculate 'Brokerage Rate' as (Brokerage / Premium) * 100, rounded to 2 decimals
+            # Calculate 'Brokerage Rate' = (Brokerage / Premium)*100
             if 'Premium' in processed_df.columns and 'Brokerage' in processed_df.columns:
                 processed_df['Brokerage Rate'] = processed_df.apply(
-                    lambda row: (float(row['Brokerage']) / float(row['Premium']) * 100) if float(row['Premium']) != 0 else 0,
+                    lambda row: (float(row['Brokerage']) / float(row['Premium']) * 100) 
+                                if float(row['Premium']) != 0 else 0,
                     axis=1
                 )
                 processed_df['Brokerage Rate'] = processed_df['Brokerage Rate'].round(2)
 
-            # Round numeric columns to 2 decimal places and format
+            # Round numeric columns
             for column in numeric_columns:
                 if column in processed_df.columns:
                     processed_df[column] = processed_df[column].round(2)
                     processed_df[column] = processed_df[column].apply(lambda x: "{0:.2f}".format(x))
 
-            # Handle 'Branch' column (No branch logic required)
+            # Handle 'Branch' column
             processed_df['Branch'] = ''
 
-            # === Begin of Additional Processing ===
+            # === Additional Processing (unchanged from your original) ===
 
-            # Calculate sum of 'Brokerage'
+            # 1) Sum of Brokerage
             sum_brokerage = processed_df['Brokerage'].astype(float).sum()
 
-            # Get 'Amount', 'Bank', 'Date', 'Insurer Name', 'Narration' from table_4.csv
+            # 2) Find the row in table_4.csv whose 'Amount' is closest to sum_brokerage
             table_4['Amount_cleaned'] = table_4['Amount'].astype(str).str.replace(',', '').astype(float)
             table_4['Brokerage_Diff'] = abs(table_4['Amount_cleaned'] - sum_brokerage)
             amount_matching_row_index = table_4['Brokerage_Diff'].idxmin()
             amount_matching_row = table_4.loc[amount_matching_row_index]
-            narration_value_original = amount_matching_row['Amount']  # Use original amount with commas
+
+            narration_value_original = amount_matching_row['Amount']  # keep commas for narration
             bank_value = amount_matching_row['Bank']
             date_col = amount_matching_row['Date']
             insurer_name = amount_matching_row['Insurer Name']
             invoice_no = amount_matching_row['Invoice No']
-            narration_from_table_4 = amount_matching_row['Narration'] if 'Narration' in amount_matching_row and pd.notnull(amount_matching_row['Narration']) else amount_matching_row.get('Narration (Ref)','')
 
-            # Set 'NPT2' using 'Narration' from table_4
+            # if 'Narration' in table_4 row is blank, try 'Narration (Ref)' or else empty
+            if 'Narration' in amount_matching_row and pd.notnull(amount_matching_row['Narration']):
+                narration_from_table_4 = amount_matching_row['Narration']
+            else:
+                narration_from_table_4 = amount_matching_row.get('Narration (Ref)', '')
+
+            # 3) Update processed_df['NPT2'] with the narration from table_4
             processed_df['NPT2'] = narration_from_table_4
+            safe_narration = ''.join(e for e in str(narration_from_table_4) if e.isalnum() or e == ' ').strip()
 
-            # Remove special characters from 'Narration' for file naming
-            safe_narration = ''.join(e for e in narration_from_table_4 if e.isalnum() or e == ' ').strip()
-
-            # Get 'Debtor Branch Ref' from 'cust_neft_data' using 'Insurer Name' from table_4
+            # 4) Get 'Debtor Branch Ref' from cust_neft_data
             debtor_branch_ref_row = cust_neft_data[cust_neft_data['Name'] == insurer_name]
             if not debtor_branch_ref_row.empty:
                 debtor_branch_ref = debtor_branch_ref_row['No.2'].iloc[0]
             else:
                 debtor_branch_ref = ''
-
-            # Set 'Debtor Branch Ref' in processed_df
             processed_df['Debtor Branch Ref'] = debtor_branch_ref
 
-            # 'Service Tax Ledger' is derived from 'Debtor Branch Ref'
+            # 5) 'Service Tax Ledger'
             processed_df['Service Tax Ledger'] = processed_df['Debtor Branch Ref'].str.replace('CUST_NEFT_', '')
 
-            # Set 'Debtor Name' as 'Insurer Name'
+            # 6) Replace 'Debtor Name' with the actual insurer name
             processed_df['Debtor Name'] = insurer_name
 
-            # Get 'GST TDS' from table_3.csv
-            table_5['TotalTaxAmt_cleaned'] = table_5['TotalTaxAmt'].astype(str).str.replace(',', '').astype(float)
+            # 7) Find row in table_5.csv whose 'TotalTaxAmt' is closest to sum_brokerage
+            table_5['TotalTaxAmt_cleaned'] = (
+                table_5['TotalTaxAmt'].astype(str)
+                .str.replace(',', '')
+                .astype(float)
+            )
             table_5['Brokerage_Diff'] = abs(table_5['TotalTaxAmt_cleaned'] - sum_brokerage)
             matching_row_index = table_5['Brokerage_Diff'].idxmin()
             matching_row = table_5.loc[matching_row_index]
-            supplier_name_col = matching_row['SupplierName'] if 'SupplierName' in matching_row and pd.notnull(matching_row['SupplierName']) else matching_row.get('Insurer','')
+            supplier_name_col = (matching_row['SupplierName']
+                                 if 'SupplierName' in matching_row and pd.notnull(matching_row['SupplierName'])
+                                 else matching_row.get('Insurer', ''))
 
+            # 8) Check if there's a GST column in table_3
             gst_columns = [col for col in table_3.columns if 'GST' in col.upper()]
             has_gst = len(gst_columns) > 0
-
             if has_gst:
-                # GST column is available
-                gst_tds_col = gst_columns[0]  # Use the first GST column found
-                # Clean and convert the GST TDS column to float
-                table_3['GST_TDS_cleaned'] = table_3[gst_tds_col].astype(str).str.replace(',', '').astype(float)
+                gst_tds_col = gst_columns[0]
+                table_3['GST_TDS_cleaned'] = (
+                    table_3[gst_tds_col].astype(str)
+                    .str.replace(',', '')
+                    .astype(float)
+                )
                 gst_tds_2_percent = table_3['GST_TDS_cleaned'].iloc[0]
             else:
-                # GST column is not available
                 gst_tds_2_percent = 0.00
 
-            # Convert date to dd/mm/yyyy format
+            # 9) Format date
             date_col_formatted = pd.to_datetime(date_col).strftime('%d/%m/%Y')
 
-            # Create narration using original amount and no space between 'Rs.' and amount
+            # 10) Create final narration
+            #     If there's a column like 'GST @18%' in df_section, consider that as having GST
             gst_present = any(
-                'GST' in col or 'GST @18%' in col for col in section.columns
+                'GST' in str(col) or 'GST @18%' in str(col)
+                for col in df_section.columns
             )
-
             if gst_present:
-                narration = (
-                    f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} with GST 18%"
-                )
+                narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} with GST 18%"
             else:
-                narration = (
-                    f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} without GST 18%"
-                )
+                narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} without GST 18%"
 
-            # Set 'Narration' in processed_df
             processed_df['Narration'] = narration
 
-            # Map 'Bank Ledger' as in other functions
+            # 11) Bank ledger mapping
             bank_ledger_lookup = {
                 'CITI_005_2600004': 'CITIBANK 340214005 ACCOUNT',
                 'HSBC_001_2600014': 'HSBC A/C-030-618375-001',
@@ -1420,38 +1449,37 @@ def process_tata_aia_insurance(file_path, template_data, risk_code_data, cust_ne
                     break
             processed_df['Bank Ledger'] = bank_ledger_value
 
-            # Set 'TDS Ledger' as 'Debtor Name' (which is 'Insurer Name')
+            # 12) TDS Ledger -> same as Debtor Name
             processed_df['TDS Ledger'] = processed_df['Debtor Name']
 
-            # Set 'P & L JV'
+            # 13) P & L JV
             processed_df['P & L JV'] = ''
 
-            # Set default values for 'Name-AY 2025-26' and 'Gl No'
+            # 14) Hardcode or default values for 'Name-AY 2025-26' and 'Gl No'
             name_ay_2025_26 = 'TDS Receivable - AY 2025-26'
             gl_no = '2300022'
 
-            # Calculate Brokerage values for the new rows
+            # 15) Calculate the additional 3 rows
             sum_brokerage = processed_df['Brokerage'].astype(float).sum()
             narration_value_float = float(str(narration_value_original).replace(',', ''))
+
             if has_gst:
-                # GST is applicable
+                # If GST is present
                 gst_tds_18_percent = sum_brokerage * 0.18
                 first_new_row_brokerage = gst_tds_18_percent
                 second_new_row_brokerage = -gst_tds_2_percent
                 total_brokerage_with_new_rows = sum_brokerage + first_new_row_brokerage + second_new_row_brokerage
                 third_new_row_brokerage = narration_value_float - total_brokerage_with_new_rows
             else:
-                # GST is not applicable
+                # If GST is not present
                 first_new_row_brokerage = 0.00
                 second_new_row_brokerage = 0.00
                 third_new_row_brokerage = narration_value_float - sum_brokerage
 
-            # Ensure 'AccountType' does not have 'G/L Account' in any rows
             processed_df['AccountType'] = processed_df['AccountType'].replace('G/L Account', 'Customer')
 
-            # Create the additional rows based on GST availability
+            # If GST present, add 3 new rows
             if has_gst:
-                # Add three rows
                 new_rows = pd.DataFrame({
                     'Entry No.': '',
                     'Debtor Name': processed_df['Debtor Name'].iloc[0],
@@ -1474,10 +1502,14 @@ def process_tata_aia_insurance(file_path, template_data, risk_code_data, cust_ne
                     'AccountTypeDuplicate': ['Customer', 'G/L Account', 'G/L Account'],
                     'Service Tax Ledger': [
                         processed_df['Service Tax Ledger'].iloc[0],
-                        gl_no,  # Use default or hardcoded value
-                        '2300022'  # Third new row remains '2300022'
+                        gl_no,  
+                        '2300022'
                     ],
-                    'TDS Ledger': [processed_df['TDS Ledger'].iloc[0], name_ay_2025_26, 'TDS Receivable - AY 2025-26'],
+                    'TDS Ledger': [
+                        processed_df['TDS Ledger'].iloc[0],
+                        name_ay_2025_26,
+                        'TDS Receivable - AY 2025-26'
+                    ],
                     'RepDate': processed_df['RepDate'].iloc[-1],
                     'Branch': '',
                     'Income category': processed_df['Income category'].iloc[-1],
@@ -1486,8 +1518,7 @@ def process_tata_aia_insurance(file_path, template_data, risk_code_data, cust_ne
                     'NPT2': processed_df['NPT2'].iloc[-1]
                 })
             else:
-                # Add only one row for TDS
-                third_new_row_brokerage = narration_value_float - sum_brokerage
+                # If GST not present, only 1 new row for TDS
                 new_rows = pd.DataFrame({
                     'Entry No.': '',
                     'Debtor Name': processed_df['Debtor Name'].iloc[0],
@@ -1508,7 +1539,7 @@ def process_tata_aia_insurance(file_path, template_data, risk_code_data, cust_ne
                     'NPT': '',
                     'Bank Ledger': bank_ledger_value,
                     'AccountTypeDuplicate': 'G/L Account',
-                    'Service Tax Ledger': '2300022',  # TDS Ledger
+                    'Service Tax Ledger': '2300022',
                     'TDS Ledger': 'TDS Receivable - AY 2025-26',
                     'RepDate': processed_df['RepDate'].iloc[-1],
                     'Branch': '',
@@ -1518,20 +1549,18 @@ def process_tata_aia_insurance(file_path, template_data, risk_code_data, cust_ne
                     'NPT2': processed_df['NPT2'].iloc[-1]
                 })
 
-            # Ensure numeric columns are formatted properly
+            # Ensure numeric columns in new_rows
             for column in numeric_columns:
                 if column in new_rows.columns:
                     new_rows[column] = pd.to_numeric(new_rows[column], errors='coerce').fillna(0)
                     new_rows[column] = new_rows[column].round(2)
                     new_rows[column] = new_rows[column].apply(lambda x: "{0:.2f}".format(x))
 
-            # Concatenate new_rows to processed_df
+            # Concatenate
             processed_df = pd.concat([processed_df, new_rows], ignore_index=True)
-
-            # Update 'Entry No.'
             processed_df['Entry No.'] = range(1, len(processed_df) + 1)
 
-            # Rearranging columns to desired order
+            # Rearrange columns
             desired_columns = [
                 'Entry No.', 'Debtor Name', 'Nature of Transaction', 'AccountType', 'Debtor Branch Ref',
                 'Client Name', 'Policy No.', 'Risk', 'Endorsement No.', 'Policy Type', 'Policy Start Date',
@@ -1539,61 +1568,60 @@ def process_tata_aia_insurance(file_path, template_data, risk_code_data, cust_ne
                 'AccountTypeDuplicate', 'Service Tax Ledger', 'TDS Ledger', 'RepDate', 'Branch',
                 'Income category', 'ASP Practice', 'P & L JV', 'NPT2'
             ]
-
-            # Ensure all desired columns are present
             for col in desired_columns:
                 if col not in processed_df.columns:
                     processed_df[col] = ''
             processed_df = processed_df[desired_columns]
 
-            # === End of Additional Processing ===
-
-            # Remove empty rows in processed_df (rows where all columns except 'Entry No.' are empty)
+            # Remove rows where all columns except 'Entry No.' are empty
             processed_df = processed_df.dropna(how='all', subset=processed_df.columns.difference(['Entry No.'])).reset_index(drop=True)
-
-            # Update 'Entry No.' after removing empty rows
             processed_df['Entry No.'] = range(1, len(processed_df) + 1)
 
-            # Generate the shortened subject and date for the filename
-            short_subject = subject[:50].strip().replace(' ', '_').replace('.', '').replace(':', '')  # Shorten to 50 characters
-            short_narration = safe_narration[:50].strip().replace(' ', '_')  # Shorten to 50 characters
-            date_str = datetime.now().strftime("%Y%m%d")  # Date only
+            # -----------------------------------------------------------------
+            # (B) Save the processed DataFrame for THIS section
+            # -----------------------------------------------------------------
+            short_subject = subject[:50].strip().replace(' ', '_').replace('.', '').replace(':', '')
+            short_narration = safe_narration[:50].strip().replace(' ', '_')
+            date_str = datetime.now().strftime("%Y%m%d")
 
-            # Define output directories for Tata AIA Insurance
+            # Define output directories
             base_dir = r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller\Common folder AP & AR\Brokerage Statement Automation\Tata AIA Insurance Template Files'
             excel_dir = os.path.join(base_dir, 'excel_file')
             csv_dir = os.path.join(base_dir, 'csv_file')
-
-            # Ensure directories exist
             os.makedirs(excel_dir, exist_ok=True)
             os.makedirs(csv_dir, exist_ok=True)
 
-            # Ensure that numeric columns are cast as numbers before saving
+            # Ensure numeric columns are numbers before saving
             for column in numeric_columns:
                 if column in processed_df.columns:
                     processed_df[column] = pd.to_numeric(processed_df[column], errors='coerce').fillna(0)
 
-            # Save the processed dataframe
-            excel_file_name = f'{short_narration}_{date_str}.xlsx'
-            csv_file_name = f'{short_narration}_{date_str}.csv'
+            excel_file_name = f'{short_narration}_section_{i+1}_{date_str}.xlsx'
+            csv_file_name = f'{short_narration}_section_{i+1}_{date_str}.csv'
             excel_file_path = os.path.join(excel_dir, excel_file_name)
             csv_file_path = os.path.join(csv_dir, csv_file_name)
+
             processed_df.to_excel(excel_file_path, index=False)
             processed_df.to_csv(csv_file_path, index=False)
+
             print(f"Saved Excel file: {excel_file_path}")
             print(f"Saved CSV file: {csv_file_path}")
 
-            # Collect the processed dataframe and file paths
             processed_dataframes.append(processed_df)
             excel_file_paths.append(excel_file_path)
-            csv_file_paths.append(csv_file_path)
 
-        # After processing all sections, you can choose to return all dataframes and paths
-        # Here, returning lists of dataframes and their corresponding Excel file paths
-        return excel_file_paths[0], csv_file_paths[0]
+        # ---------------------------------------------------------------------
+        # 4. Return the first processed DataFrame and the first Excel file path
+        # ---------------------------------------------------------------------
+        if processed_dataframes and excel_file_paths:
+            return processed_dataframes[0], excel_file_paths[0]
+        else:
+            # If we never found any valid section, return empty
+            empty_df = pd.DataFrame()
+            return empty_df, ""
 
     except Exception as e:
-        print(f"Error processing Tata AIA Insurance data: {str(e)}")
+        print(f"Error processing Tata AIA data: {str(e)}")
         raise
 
 
