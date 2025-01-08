@@ -1185,70 +1185,72 @@ def process_united_india_insurance(file_path, template_data, risk_code_data, cus
         raise
 
 
+import os
+import pandas as pd
+from datetime import datetime
+
 def process_tata_aia_insurance(file_path, template_data, risk_code_data, cust_neft_data, table_3, table_4, table_5, subject, mappings):
     try:
-        # Determine file extension
+        # Read the file based on its extension, assuming the first row is the header
         file_extension = os.path.splitext(file_path)[1].lower()
 
-        # Read the entire file without setting a header to detect repeated headers
         if file_extension == '.xlsx':
-            data = pd.read_excel(file_path, header=None)
+            data = pd.read_excel(file_path, header=0)
         elif file_extension == '.xlsb':
-            data = pd.read_excel(file_path, engine='pyxlsb', header=None)
+            data = pd.read_excel(file_path, engine='pyxlsb', header=0)
         elif file_extension == '.csv':
-            data = pd.read_csv(file_path, header=None)
+            data = pd.read_csv(file_path, header=0)
         elif file_extension == '.ods':
-            data = pd.read_excel(file_path, engine='odf', header=None)
+            data = pd.read_excel(file_path, engine='odf', header=0)
         elif file_extension == '.txt':
-            data = pd.read_csv(file_path, delimiter='\t', header=None)
+            data = pd.read_csv(file_path, delimiter='\t', header=0)
         elif file_extension == '.xls':
-            data = pd.read_excel(file_path, engine='xlrd', header=None)
+            data = pd.read_excel(file_path, engine='xlrd', header=0)
         else:
             raise ValueError("Unsupported file format")
 
-        # Remove completely empty rows
+        # Remove empty rows to avoid empty dataframes
         data = data.dropna(how='all').reset_index(drop=True)
 
-        # Assuming the first row is the header
-        header = template_data.columns.tolist()
+        # Identify the header row to split into sections
+        header = data.columns.tolist()
+        header_mask = data.apply(lambda row: row.tolist() == header, axis=1)
+        header_indices = header_mask[header_mask].index.tolist()
 
-        # Identify all header row indices by matching with the expected header
-        header_indices = []
-        for idx, row in data.iterrows():
-            # Convert the row to a list of strings for comparison
-            row_values = row.astype(str).str.strip().tolist()
-            # Compare with the expected header
-            if row_values[:len(header)] == header:
-                header_indices.append(idx)
-
+        # If no repeated headers are found, treat the entire data as one section
         if not header_indices:
-            raise ValueError("No header rows found in the file.")
+            header_indices = [0]
 
-        # Append the end of the DataFrame to handle the last section
-        header_indices.append(len(data))
+        sections = []
+        for i in range(len(header_indices)):
+            start_idx = header_indices[i]
+            end_idx = header_indices[i + 1] if i + 1 < len(header_indices) else len(data)
+            section = data.iloc[start_idx:end_idx].reset_index(drop=True)
+            sections.append(section)
 
-        processed_dfs = []      # To store all processed DataFrames
-        output_paths = []       # To store all output file paths
+        # Prepare output directories
+        base_dir = r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller\Common folder AP & AR\Brokerage Statement Automation\Tata AIA Insurance Template Files'
+        excel_dir = os.path.join(base_dir, 'excel_file')
+        csv_dir = os.path.join(base_dir, 'csv_file')
+        os.makedirs(excel_dir, exist_ok=True)
+        os.makedirs(csv_dir, exist_ok=True)
 
-        # Loop through each section based on header indices
-        for section_num in range(len(header_indices) - 1):
-            start_idx = header_indices[section_num]
-            end_idx = header_indices[section_num + 1]
+        processed_sections = []
 
-            # Extract the section data (excluding the header row)
-            section_data = data.iloc[start_idx + 1:end_idx].reset_index(drop=True)
+        # Iterate over each section and process
+        for section_num, section_data in enumerate(sections, start=1):
+            # Remove the header row from sections beyond the first
+            if section_num > 1:
+                section_data = section_data.iloc[1:].reset_index(drop=True)
 
-            # Assign column names based on the header
-            section_data.columns = header
-
-            # Remove rows with less than 4 non-NA values
+            # Remove rows with less than 4 non-NA columns
             section_data = section_data[section_data.apply(lambda row: row.count() >= 4, axis=1)].reset_index(drop=True)
 
             # Clean column names and data
             section_data.columns = section_data.columns.str.strip()
             section_data = section_data.applymap(lambda x: x.strip() if isinstance(x, str) else x)
 
-            # Remove rows where only 'Comm' or 'Premium' columns have data
+            # Remove rows where only 'Comm' or 'Premium' has data, and rest are blank
             if 'Comm' in section_data.columns and 'Premium' in section_data.columns:
                 section_data = section_data[~(((section_data['Comm'].notna()) & (section_data.drop(columns=['Comm']).isna().all(axis=1))) |
                                               ((section_data['Premium'].notna()) & (section_data.drop(columns=['Premium']).isna().all(axis=1))))].reset_index(drop=True)
@@ -1260,7 +1262,7 @@ def process_tata_aia_insurance(file_path, template_data, risk_code_data, cust_ne
             # Create a copy of the template_data
             processed_df = template_data.copy()
 
-            # Apply mappings if provided
+            # Process mappings from frontend (attachment columns on left, template columns on right)
             if mappings:
                 for attachment_col, template_col in mappings.items():
                     if attachment_col in section_data.columns:
@@ -1268,7 +1270,8 @@ def process_tata_aia_insurance(file_path, template_data, risk_code_data, cust_ne
                     else:
                         processed_df[template_col] = ''
             else:
-                pass  # Proceed without mappings
+                # If mappings are not provided, proceed without them
+                pass
 
             # Create necessary columns
             processed_df['Entry No.'] = range(1, len(processed_df) + 1)
@@ -1333,7 +1336,7 @@ def process_tata_aia_insurance(file_path, template_data, risk_code_data, cust_ne
             date_col = amount_matching_row['Date']
             insurer_name = amount_matching_row['Insurer Name']
             invoice_no = amount_matching_row['Invoice No']
-            narration_from_table_4 = amount_matching_row['Narration'] if 'Narration' in amount_matching_row and pd.notnull(amount_matching_row['Narration']) else amount_matching_row.get('Narration (Ref)', '')
+            narration_from_table_4 = amount_matching_row['Narration'] if 'Narration' in amount_matching_row and pd.notnull(amount_matching_row['Narration']) else amount_matching_row.get('Narration (Ref)','')
 
             # Set 'NPT2' using 'Narration' from table_4
             processed_df['NPT2'] = narration_from_table_4
@@ -1362,7 +1365,7 @@ def process_tata_aia_insurance(file_path, template_data, risk_code_data, cust_ne
             table_5['Brokerage_Diff'] = abs(table_5['TotalTaxAmt_cleaned'] - sum_brokerage)
             matching_row_index = table_5['Brokerage_Diff'].idxmin()
             matching_row = table_5.loc[matching_row_index]
-            supplier_name_col = matching_row['SupplierName'] if 'SupplierName' in matching_row and pd.notnull(matching_row['SupplierName']) else matching_row.get('Insurer', '')
+            supplier_name_col = matching_row['SupplierName'] if 'SupplierName' in matching_row and pd.notnull(matching_row['SupplierName']) else matching_row.get('Insurer','')
 
             gst_columns = [col for col in table_3.columns if 'GST' in col.upper()]
             has_gst = len(gst_columns) > 0
@@ -1380,9 +1383,9 @@ def process_tata_aia_insurance(file_path, template_data, risk_code_data, cust_ne
             # Convert date to dd/mm/yyyy format
             date_col_formatted = pd.to_datetime(date_col).strftime('%d/%m/%Y')
 
-            # Check if GST is present in the data columns
+            # Check if GST is present in data columns
             gst_present = any(
-                'GST' in col or 'GST @18%' in col for col in section_data.columns
+                'GST' in col.upper() or 'GST @18%' in col.upper() for col in section_data.columns
             )
 
             # Create narration using original amount and no space between 'Rs.' and amount
@@ -1417,8 +1420,8 @@ def process_tata_aia_insurance(file_path, template_data, risk_code_data, cust_ne
             # Set 'P & L JV'
             processed_df['P & L JV'] = ''
 
-            # Hardcode or set default values for 'Name-AY 2025-26' and 'Gl No'
-            name_ay_2025_26 = 'TDS Receivable - AY 2025-26'  # Default value
+            # Since 'SupplierState' is not needed, set default values for 'Name-AY 2025-26' and 'Gl No'
+            name_ay_2025_26 = 'TDS Receivable - AY 2025-26'  # Or any default value as per your requirement
             gl_no = '2300022'  # Default GL number for TDS
 
             # Calculate Brokerage values for the new rows
@@ -1537,7 +1540,9 @@ def process_tata_aia_insurance(file_path, template_data, risk_code_data, cust_ne
                     processed_df[col] = ''
             processed_df = processed_df[desired_columns]
 
-            # Remove empty rows in processed_df except 'Entry No.'
+            # === End of Additional Processing ===
+
+            # Remove empty rows in processed_df (excluding 'Entry No.')
             processed_df = processed_df.dropna(how='all', subset=processed_df.columns.difference(['Entry No.'])).reset_index(drop=True)
 
             # Update 'Entry No.' after removing empty rows
@@ -1548,45 +1553,33 @@ def process_tata_aia_insurance(file_path, template_data, risk_code_data, cust_ne
             short_narration = safe_narration[:50].strip().replace(' ', '_')  # Shorten to 50 characters
             date_str = datetime.now().strftime("%Y%m%d")  # Date only
 
-            # Define output directories for Tata AIA Insurance
-            base_dir = r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller\Common folder AP & AR\Brokerage Statement Automation\Tata AIA Insurance Template Files'
-            excel_dir = os.path.join(base_dir, 'excel_file')
-            csv_dir = os.path.join(base_dir, 'csv_file')
-
-            # Ensure directories exist
-            os.makedirs(excel_dir, exist_ok=True)
-            os.makedirs(csv_dir, exist_ok=True)
+            # Define filenames with section number
+            excel_file_name = f'{short_narration}_Section{section_num}_{date_str}.xlsx'
+            csv_file_name = f'{short_narration}_Section{section_num}_{date_str}.csv'
+            excel_file_path = os.path.join(excel_dir, excel_file_name)
+            csv_file_path = os.path.join(csv_dir, csv_file_name)
 
             # Ensure that numeric columns are cast as numbers before saving
             for column in numeric_columns:
                 if column in processed_df.columns:
                     processed_df[column] = pd.to_numeric(processed_df[column], errors='coerce').fillna(0)
 
-            # Define section-specific file names
-            excel_file_name = f'{short_narration}_section_{section_num + 1}_{date_str}.xlsx'
-            csv_file_name = f'{short_narration}_section_{section_num + 1}_{date_str}.csv'
-            excel_file_path = os.path.join(excel_dir, excel_file_name)
-            csv_file_path = os.path.join(csv_dir, csv_file_name)
-
             # Save the processed dataframe
             processed_df.to_excel(excel_file_path, index=False)
             processed_df.to_csv(csv_file_path, index=False)
-            print(f"Saved Excel file: {excel_file_path}")
-            print(f"Saved CSV file: {csv_file_path}")
+            print(f"Saved Excel file for Section {section_num}: {excel_file_path}")
+            print(f"Saved CSV file for Section {section_num}: {csv_file_path}")
 
-            # Append to lists
-            processed_dfs.append(processed_df)
-            output_paths.append((excel_file_path, csv_file_path))
+            # Collect processed sections if needed
+            processed_sections.append((processed_df, excel_file_path))
 
-        # Optionally, you can concatenate all processed DataFrames if needed
-        # all_processed_df = pd.concat(processed_dfs, ignore_index=True)
-
-        # Return the list of processed DataFrames and their corresponding Excel file paths
-        return processed_dfs, output_paths
+        # Return all processed dataframes and their corresponding Excel file paths
+        return processed_sections
 
     except Exception as e:
         print(f"An error occurred: {e}")
         return None, None
+
 
 
 def process_icici_lombard_insurance(file_path, template_data, risk_code_data, cust_neft_data,
