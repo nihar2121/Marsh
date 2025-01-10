@@ -129,21 +129,24 @@ def process_file(filepath):
         raise ValueError(f"Error reading support file: {e}")
 
     # Ensure required columns exist in support file
-    required_support_columns = ['lookup_account', 'base_account', 'to_account']
+    required_support_columns = ['lookup_account', 'Category', 'base_account', 'to_account']
     for col in required_support_columns:
         if col not in support_df.columns:
             raise ValueError(f"Missing required column in support file: {col}")
 
-    # Create a mapping dictionary
-    account_mapping = support_df.set_index('lookup_account').to_dict('index')
+    # Create a multi-level mapping dictionary based on 'lookup_account' and 'Category'
+    account_mapping = {}
+    for _, row in support_df.iterrows():
+        key = (str(row['lookup_account']).lower(), str(row['Category']).strip())
+        account_mapping[key] = {
+            'base_account': row['base_account'],
+            'to_account': row['to_account']
+        }
 
-    # Retrieve base_account and to_account based on prefix_raw
-    mapping = account_mapping.get(prefix_raw.lower())
-    if not mapping:
-        raise ValueError(f"Lookup account '{prefix_raw}' not found in support file.")
-
-    base_account = mapping['base_account']
-    to_account = mapping['to_account']
+    # Retrieve mapping for the current prefix
+    categories_available = [cat for (lookup, cat) in account_mapping.keys() if lookup == prefix_raw.lower()]
+    if not categories_available:
+        raise ValueError(f"No categories found for lookup account '{prefix_raw}' in support file.")
 
     # Initialize list to collect new entries
     processed_entries = []
@@ -195,6 +198,13 @@ def process_file(filepath):
             doc_prefix = "BR"
             document_no = f"{prefix_formatted}/{doc_prefix}/{month_abbr}/{br_counter:03d}"
 
+            # Retrieve accounts based on 'Receipt' category
+            key = (prefix_raw.lower(), "Receipt")
+            if key not in account_mapping:
+                raise ValueError(f"No account mapping found for lookup account '{prefix_raw}' and category 'Receipt'.")
+            base_account = account_mapping[key]['base_account']
+            to_account = account_mapping[key]['to_account']
+
             # Positive entry: base_account
             positive_entry = {
                 'EntryNo': entry_no,
@@ -207,40 +217,7 @@ def process_file(filepath):
                 'Narration': description,
                 'NatureofTransaction': 'Bank Receipt',
                 # Fill other columns with empty strings
-                'ReceiptType': '',
-                'CurrencyCode': '',
-                'CurrencyRate': '',
-                'ExternalDocumentNo': '',
-                'BranchDimensionCode': '',
-                'CoverNo': '',
-                'InsuranceBranch': '',
-                'MarshBranch': '',
-                'Department': '',
-                'ServicerID': '',
-                'CE Name': '',
-                'ClientName': '',
-                'PolicyNo': '',
-                'EndorsementNo': '',
-                'Risk': '',
-                'ASP_PRACTICE': '',
-                'IncomeCategory': '',
-                'PolInceptionDate': '',
-                'Pol.End Dt.': '',
-                'Premium': '',
-                'Premium GST': '',
-                'BrokerageRate': '',
-                'INSURER_TYPE': '',
-                'INSURER_NAME': '',
-                'PROPORTION': '',
-                'BRIEF_DESC': '',
-                'Curr.': '',
-                'Curr_Rate': '',
-                'BROKERAGE_FEE_DUE': '',
-                'iTrack No.': '',
-                'FinanceSPOC': '',
-                'Grouping': '',
-                'Due Date': '',
-                'Overdue': ''
+                **{col: '' for col in sample_df.columns if col not in ['EntryNo', 'DocumentNo', 'LineNo', 'AccountType', 'AccountNo', 'PostingDate', 'Amount', 'Narration', 'NatureofTransaction']}
             }
 
             # Negative entry: to_account
@@ -255,40 +232,7 @@ def process_file(filepath):
                 'Narration': description,
                 'NatureofTransaction': 'Bank Receipt',
                 # Fill other columns with empty strings
-                'ReceiptType': '',
-                'CurrencyCode': '',
-                'CurrencyRate': '',
-                'ExternalDocumentNo': '',
-                'BranchDimensionCode': '',
-                'CoverNo': '',
-                'InsuranceBranch': '',
-                'MarshBranch': '',
-                'Department': '',
-                'ServicerID': '',
-                'CE Name': '',
-                'ClientName': '',
-                'PolicyNo': '',
-                'EndorsementNo': '',
-                'Risk': '',
-                'ASP_PRACTICE': '',
-                'IncomeCategory': '',
-                'PolInceptionDate': '',
-                'Pol.End Dt.': '',
-                'Premium': '',
-                'Premium GST': '',
-                'BrokerageRate': '',
-                'INSURER_TYPE': '',
-                'INSURER_NAME': '',
-                'PROPORTION': '',
-                'BRIEF_DESC': '',
-                'Curr.': '',
-                'Curr_Rate': '',
-                'BROKERAGE_FEE_DUE': '',
-                'iTrack No.': '',
-                'FinanceSPOC': '',
-                'Grouping': '',
-                'Due Date': '',
-                'Overdue': ''
+                **{col: '' for col in sample_df.columns if col not in ['EntryNo', 'DocumentNo', 'LineNo', 'AccountType', 'AccountNo', 'PostingDate', 'Amount', 'Narration', 'NatureofTransaction']}
             }
 
             # Append the entries to processed_entries list
@@ -299,11 +243,19 @@ def process_file(filepath):
             br_counter += 1
             entry_no += 2
 
-        elif category in ["Payment", "Bank Charges"]:
+        elif category in ["Payment", "Bank Charges", "Brokerage Transfer"]:
             # DocumentNo: {prefix}/BP/{Month}/Counter
             doc_prefix = "BP"
             document_no = f"{prefix_formatted}/{doc_prefix}/{month_abbr}/{bp_counter:03d}"
 
+            if category in ["Payment", "Receipt", "Brokerage Transfer"]:
+                # Retrieve accounts based on the current category
+                key = (prefix_raw.lower(), category)
+                if key not in account_mapping:
+                    raise ValueError(f"No account mapping found for lookup account '{prefix_raw}' and category '{category}'.")
+                base_account = account_mapping[key]['base_account']
+                to_account = account_mapping[key]['to_account']
+            # For Bank Charges, accounts are handled separately
             # Ensure debit_amt is positive
             debit_amt_positive = abs(debit_amt) if pd.notna(debit_amt) else 0
 
@@ -320,40 +272,7 @@ def process_file(filepath):
                     'Narration': description,
                     'NatureofTransaction': 'Bank Payment',
                     # Fill other columns with empty strings
-                    'ReceiptType': '',
-                    'CurrencyCode': '',
-                    'CurrencyRate': '',
-                    'ExternalDocumentNo': '',
-                    'BranchDimensionCode': '',
-                    'CoverNo': '',
-                    'InsuranceBranch': '',
-                    'MarshBranch': '',
-                    'Department': '',
-                    'ServicerID': '',
-                    'CE Name': '',
-                    'ClientName': '',
-                    'PolicyNo': '',
-                    'EndorsementNo': '',
-                    'Risk': '',
-                    'ASP_PRACTICE': '',
-                    'IncomeCategory': '',
-                    'PolInceptionDate': '',
-                    'Pol.End Dt.': '',
-                    'Premium': '',
-                    'Premium GST': '',
-                    'BrokerageRate': '',
-                    'INSURER_TYPE': '',
-                    'INSURER_NAME': '',
-                    'PROPORTION': '',
-                    'BRIEF_DESC': '',
-                    'Curr.': '',
-                    'Curr_Rate': '',
-                    'BROKERAGE_FEE_DUE': '',
-                    'iTrack No.': '',
-                    'FinanceSPOC': '',
-                    'Grouping': '',
-                    'Due Date': '',
-                    'Overdue': ''
+                    **{col: '' for col in sample_df.columns if col not in ['EntryNo', 'DocumentNo', 'LineNo', 'AccountType', 'AccountNo', 'PostingDate', 'Amount', 'Narration', 'NatureofTransaction']}
                 }
 
                 # Negative entry: to_account
@@ -368,43 +287,11 @@ def process_file(filepath):
                     'Narration': description,
                     'NatureofTransaction': 'Bank Payment',
                     # Fill other columns with empty strings
-                    'ReceiptType': '',
-                    'CurrencyCode': '',
-                    'CurrencyRate': '',
-                    'ExternalDocumentNo': '',
-                    'BranchDimensionCode': '',
-                    'CoverNo': '',
-                    'InsuranceBranch': '',
-                    'MarshBranch': '',
-                    'Department': '',
-                    'ServicerID': '',
-                    'CE Name': '',
-                    'ClientName': '',
-                    'PolicyNo': '',
-                    'EndorsementNo': '',
-                    'Risk': '',
-                    'ASP_PRACTICE': '',
-                    'IncomeCategory': '',
-                    'PolInceptionDate': '',
-                    'Pol.End Dt.': '',
-                    'Premium': '',
-                    'Premium GST': '',
-                    'BrokerageRate': '',
-                    'INSURER_TYPE': '',
-                    'INSURER_NAME': '',
-                    'PROPORTION': '',
-                    'BRIEF_DESC': '',
-                    'Curr.': '',
-                    'Curr_Rate': '',
-                    'BROKERAGE_FEE_DUE': '',
-                    'iTrack No.': '',
-                    'FinanceSPOC': '',
-                    'Grouping': '',
-                    'Due Date': '',
-                    'Overdue': ''
+                    **{col: '' for col in sample_df.columns if col not in ['EntryNo', 'DocumentNo', 'LineNo', 'AccountType', 'AccountNo', 'PostingDate', 'Amount', 'Narration', 'NatureofTransaction']}
                 }
 
-            else:  # Bank Charges
+            elif category == "Bank Charges":
+                # Bank Charges logic remains unchanged
                 # Positive entry: G/L Account (same as original behavior)
                 positive_entry = {
                     'EntryNo': entry_no,
@@ -417,40 +304,7 @@ def process_file(filepath):
                     'Narration': description,
                     'NatureofTransaction': 'Bank Payment',
                     # Fill other columns with empty strings
-                    'ReceiptType': '',
-                    'CurrencyCode': '',
-                    'CurrencyRate': '',
-                    'ExternalDocumentNo': '',
-                    'BranchDimensionCode': '',
-                    'CoverNo': '',
-                    'InsuranceBranch': '',
-                    'MarshBranch': '',
-                    'Department': '',
-                    'ServicerID': '',
-                    'CE Name': '',
-                    'ClientName': '',
-                    'PolicyNo': '',
-                    'EndorsementNo': '',
-                    'Risk': '',
-                    'ASP_PRACTICE': '',
-                    'IncomeCategory': '',
-                    'PolInceptionDate': '',
-                    'Pol.End Dt.': '',
-                    'Premium': '',
-                    'Premium GST': '',
-                    'BrokerageRate': '',
-                    'INSURER_TYPE': '',
-                    'INSURER_NAME': '',
-                    'PROPORTION': '',
-                    'BRIEF_DESC': '',
-                    'Curr.': '',
-                    'Curr_Rate': '',
-                    'BROKERAGE_FEE_DUE': '',
-                    'iTrack No.': '',
-                    'FinanceSPOC': '',
-                    'Grouping': '',
-                    'Due Date': '',
-                    'Overdue': ''
+                    **{col: '' for col in sample_df.columns if col not in ['EntryNo', 'DocumentNo', 'LineNo', 'AccountType', 'AccountNo', 'PostingDate', 'Amount', 'Narration', 'NatureofTransaction']}
                 }
 
                 # Negative entry: Bank Account (same as original behavior)
@@ -465,153 +319,50 @@ def process_file(filepath):
                     'Narration': description,
                     'NatureofTransaction': 'Bank Payment',
                     # Fill other columns with empty strings
-                    'ReceiptType': '',
-                    'CurrencyCode': '',
-                    'CurrencyRate': '',
-                    'ExternalDocumentNo': '',
-                    'BranchDimensionCode': '',
-                    'CoverNo': '',
-                    'InsuranceBranch': '',
-                    'MarshBranch': '',
-                    'Department': '',
-                    'ServicerID': '',
-                    'CE Name': '',
-                    'ClientName': '',
-                    'PolicyNo': '',
-                    'EndorsementNo': '',
-                    'Risk': '',
-                    'ASP_PRACTICE': '',
-                    'IncomeCategory': '',
-                    'PolInceptionDate': '',
-                    'Pol.End Dt.': '',
-                    'Premium': '',
-                    'Premium GST': '',
-                    'BrokerageRate': '',
-                    'INSURER_TYPE': '',
-                    'INSURER_NAME': '',
-                    'PROPORTION': '',
-                    'BRIEF_DESC': '',
-                    'Curr.': '',
-                    'Curr_Rate': '',
-                    'BROKERAGE_FEE_DUE': '',
-                    'iTrack No.': '',
-                    'FinanceSPOC': '',
-                    'Grouping': '',
-                    'Due Date': '',
-                    'Overdue': ''
+                    **{col: '' for col in sample_df.columns if col not in ['EntryNo', 'DocumentNo', 'LineNo', 'AccountType', 'AccountNo', 'PostingDate', 'Amount', 'Narration', 'NatureofTransaction']}
                 }
 
-            # Append the entries to processed_entries list
-            processed_entries.append(positive_entry)
-            processed_entries.append(negative_entry)
+            elif category == "Brokerage Transfer":
+                # Retrieve accounts based on 'Brokerage Transfer' category
+                key = (prefix_raw.lower(), "Brokerage Transfer")
+                if key not in account_mapping:
+                    raise ValueError(f"No account mapping found for lookup account '{prefix_raw}' and category 'Brokerage Transfer'.")
+                base_account = account_mapping[key]['base_account']
+                to_account = account_mapping[key]['to_account']
 
-            # Increment counters
-            bp_counter += 1
-            entry_no += 2
+                # Positive entry: Bank Account
+                positive_entry = {
+                    'EntryNo': entry_no,
+                    'DocumentNo': document_no,
+                    'LineNo': 1,
+                    'AccountType': 'Bank Account',
+                    'AccountNo': to_account,
+                    'PostingDate': posting_date,
+                    'Amount': debit_amt_positive,
+                    'Narration': description,
+                    'NatureofTransaction': 'Contra',
+                    # Fill other columns with empty strings
+                    **{col: '' for col in sample_df.columns if col not in ['EntryNo', 'DocumentNo', 'LineNo', 'AccountType', 'AccountNo', 'PostingDate', 'Amount', 'Narration', 'NatureofTransaction']}
+                }
 
-        elif category == "Brokerage Transfer":
-            # DocumentNo: {prefix}/BP/{Month}/Counter
-            doc_prefix = "BP"
-            document_no = f"{prefix_formatted}/{doc_prefix}/{month_abbr}/{bp_counter:03d}"
+                # Negative entry: G/L Account
+                negative_entry = {
+                    'EntryNo': entry_no + 1,
+                    'DocumentNo': document_no,
+                    'LineNo': 2,
+                    'AccountType': 'G/L Account',
+                    'AccountNo': base_account,
+                    'PostingDate': posting_date,
+                    'Amount': -debit_amt_positive,
+                    'Narration': description,
+                    'NatureofTransaction': 'Contra',
+                    # Fill other columns with empty strings
+                    **{col: '' for col in sample_df.columns if col not in ['EntryNo', 'DocumentNo', 'LineNo', 'AccountType', 'AccountNo', 'PostingDate', 'Amount', 'Narration', 'NatureofTransaction']}
+                }
 
-            # Ensure debit_amt is positive
-            debit_amt_positive = abs(debit_amt) if pd.notna(debit_amt) else 0
-
-            # Positive entry: Bank Account
-            positive_entry = {
-                'EntryNo': entry_no,
-                'DocumentNo': document_no,
-                'LineNo': 1,
-                'AccountType': 'Bank Account',
-                'AccountNo': 2600005,
-                'PostingDate': posting_date,
-                'Amount': debit_amt_positive,
-                'Narration': description,
-                'NatureofTransaction': 'Contra',
-                # Fill other columns with empty strings
-                'ReceiptType': '',
-                'CurrencyCode': '',
-                'CurrencyRate': '',
-                'ExternalDocumentNo': '',
-                'BranchDimensionCode': '',
-                'CoverNo': '',
-                'InsuranceBranch': '',
-                'MarshBranch': '',
-                'Department': '',
-                'ServicerID': '',
-                'CE Name': '',
-                'ClientName': '',
-                'PolicyNo': '',
-                'EndorsementNo': '',
-                'Risk': '',
-                'ASP_PRACTICE': '',
-                'IncomeCategory': '',
-                'PolInceptionDate': '',
-                'Pol.End Dt.': '',
-                'Premium': '',
-                'Premium GST': '',
-                'BrokerageRate': '',
-                'INSURER_TYPE': '',
-                'INSURER_NAME': '',
-                'PROPORTION': '',
-                'BRIEF_DESC': '',
-                'Curr.': '',
-                'Curr_Rate': '',
-                'BROKERAGE_FEE_DUE': '',
-                'iTrack No.': '',
-                'FinanceSPOC': '',
-                'Grouping': '',
-                'Due Date': '',
-                'Overdue': ''
-            }
-
-            # Negative entry: G/L Account
-            negative_entry = {
-                'EntryNo': entry_no + 1,
-                'DocumentNo': document_no,
-                'LineNo': 2,
-                'AccountType': 'G/L Account',
-                'AccountNo': 1500001,
-                'PostingDate': posting_date,
-                'Amount': -debit_amt_positive,
-                'Narration': description,
-                'NatureofTransaction': 'Contra',
-                # Fill other columns with empty strings
-                'ReceiptType': '',
-                'CurrencyCode': '',
-                'CurrencyRate': '',
-                'ExternalDocumentNo': '',
-                'BranchDimensionCode': '',
-                'CoverNo': '',
-                'InsuranceBranch': '',
-                'MarshBranch': '',
-                'Department': '',
-                'ServicerID': '',
-                'CE Name': '',
-                'ClientName': '',
-                'PolicyNo': '',
-                'EndorsementNo': '',
-                'Risk': '',
-                'ASP_PRACTICE': '',
-                'IncomeCategory': '',
-                'PolInceptionDate': '',
-                'Pol.End Dt.': '',
-                'Premium': '',
-                'Premium GST': '',
-                'BrokerageRate': '',
-                'INSURER_TYPE': '',
-                'INSURER_NAME': '',
-                'PROPORTION': '',
-                'BRIEF_DESC': '',
-                'Curr.': '',
-                'Curr_Rate': '',
-                'BROKERAGE_FEE_DUE': '',
-                'iTrack No.': '',
-                'FinanceSPOC': '',
-                'Grouping': '',
-                'Due Date': '',
-                'Overdue': ''
-            }
+            else:
+                # Should not reach here, but added for safety
+                continue
 
             # Append the entries to processed_entries list
             processed_entries.append(positive_entry)
