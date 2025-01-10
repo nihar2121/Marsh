@@ -91,13 +91,16 @@ def process_file(filepath):
     output_files_dir = os.path.join(ri_entries_dir, "Output Files")
     single_files_dir = os.path.join(output_files_dir, "Single Files")
     master_file_dir = os.path.join(output_files_dir, "Master File")
-
+    support_files_dir = os.path.join(output_files_dir, "support_files")
+    
     # Create directories if they don't exist
     os.makedirs(single_files_dir, exist_ok=True)
     os.makedirs(master_file_dir, exist_ok=True)
+    os.makedirs(support_files_dir, exist_ok=True)
 
-    # Define Master File path
+    # Define paths for Master File and Support File
     master_file_path = os.path.join(master_file_dir, "Master_File.xlsx")
+    support_file_path = os.path.join(support_files_dir, "support_file.xlsx")
 
     # Load Master File if it exists, else create an empty DataFrame with required columns
     if os.path.exists(master_file_path):
@@ -115,6 +118,32 @@ def process_file(filepath):
         prefix_formatted = f"{prefix_raw[:4].upper()}/{prefix_raw[4:]}"  # 'citi013' → 'CITI/013'
     else:
         raise ValueError("Filename does not start with a valid prefix (e.g., 'citi013').")
+
+    # Load the support file and create a mapping
+    if not os.path.exists(support_file_path):
+        raise FileNotFoundError(f"Support file not found at: {support_file_path}")
+
+    try:
+        support_df = pd.read_excel(support_file_path, sheet_name='Sheet2')
+    except Exception as e:
+        raise ValueError(f"Error reading support file: {e}")
+
+    # Ensure required columns exist in support file
+    required_support_columns = ['lookup_account', 'base_account', 'to_account']
+    for col in required_support_columns:
+        if col not in support_df.columns:
+            raise ValueError(f"Missing required column in support file: {col}")
+
+    # Create a mapping dictionary
+    account_mapping = support_df.set_index('lookup_account').to_dict('index')
+
+    # Retrieve base_account and to_account based on prefix_raw
+    mapping = account_mapping.get(prefix_raw.lower())
+    if not mapping:
+        raise ValueError(f"Lookup account '{prefix_raw}' not found in support file.")
+
+    base_account = mapping['base_account']
+    to_account = mapping['to_account']
 
     # Initialize list to collect new entries
     processed_entries = []
@@ -166,13 +195,13 @@ def process_file(filepath):
             doc_prefix = "BR"
             document_no = f"{prefix_formatted}/{doc_prefix}/{month_abbr}/{br_counter:03d}"
 
-            # Positive entry: Bank Account
+            # Positive entry: base_account
             positive_entry = {
                 'EntryNo': entry_no,
                 'DocumentNo': document_no,
                 'LineNo': 1,
                 'AccountType': 'Bank Account',
-                'AccountNo': 2600005,
+                'AccountNo': base_account,
                 'PostingDate': posting_date,
                 'Amount': credit_amt,
                 'Narration': description,
@@ -214,13 +243,13 @@ def process_file(filepath):
                 'Overdue': ''
             }
 
-            # Negative entry: G/L Account
+            # Negative entry: to_account
             negative_entry = {
                 'EntryNo': entry_no + 1,
                 'DocumentNo': document_no,
                 'LineNo': 2,
                 'AccountType': 'G/L Account',
-                'AccountNo': 1500001,
+                'AccountNo': to_account,
                 'PostingDate': posting_date,
                 'Amount': -credit_amt,
                 'Narration': description,
@@ -278,101 +307,199 @@ def process_file(filepath):
             # Ensure debit_amt is positive
             debit_amt_positive = abs(debit_amt) if pd.notna(debit_amt) else 0
 
-            # Positive entry: G/L Account
-            positive_entry = {
-                'EntryNo': entry_no,
-                'DocumentNo': document_no,
-                'LineNo': 1,
-                'AccountType': 'G/L Account',
-                'AccountNo': 1500001,
-                'PostingDate': posting_date,
-                'Amount': debit_amt_positive,
-                'Narration': description,
-                'NatureofTransaction': 'Bank Payment',
-                # Fill other columns with empty strings
-                'ReceiptType': '',
-                'CurrencyCode': '',
-                'CurrencyRate': '',
-                'ExternalDocumentNo': '',
-                'BranchDimensionCode': '',
-                'CoverNo': '',
-                'InsuranceBranch': '',
-                'MarshBranch': '',
-                'Department': '',
-                'ServicerID': '',
-                'CE Name': '',
-                'ClientName': '',
-                'PolicyNo': '',
-                'EndorsementNo': '',
-                'Risk': '',
-                'ASP_PRACTICE': '',
-                'IncomeCategory': '',
-                'PolInceptionDate': '',
-                'Pol.End Dt.': '',
-                'Premium': '',
-                'Premium GST': '',
-                'BrokerageRate': '',
-                'INSURER_TYPE': '',
-                'INSURER_NAME': '',
-                'PROPORTION': '',
-                'BRIEF_DESC': '',
-                'Curr.': '',
-                'Curr_Rate': '',
-                'BROKERAGE_FEE_DUE': '',
-                'iTrack No.': '',
-                'FinanceSPOC': '',
-                'Grouping': '',
-                'Due Date': '',
-                'Overdue': ''
-            }
+            if category == "Payment":
+                # Positive entry: base_account (negative amount)
+                positive_entry = {
+                    'EntryNo': entry_no,
+                    'DocumentNo': document_no,
+                    'LineNo': 1,
+                    'AccountType': 'G/L Account',
+                    'AccountNo': base_account,
+                    'PostingDate': posting_date,
+                    'Amount': -debit_amt_positive,
+                    'Narration': description,
+                    'NatureofTransaction': 'Bank Payment',
+                    # Fill other columns with empty strings
+                    'ReceiptType': '',
+                    'CurrencyCode': '',
+                    'CurrencyRate': '',
+                    'ExternalDocumentNo': '',
+                    'BranchDimensionCode': '',
+                    'CoverNo': '',
+                    'InsuranceBranch': '',
+                    'MarshBranch': '',
+                    'Department': '',
+                    'ServicerID': '',
+                    'CE Name': '',
+                    'ClientName': '',
+                    'PolicyNo': '',
+                    'EndorsementNo': '',
+                    'Risk': '',
+                    'ASP_PRACTICE': '',
+                    'IncomeCategory': '',
+                    'PolInceptionDate': '',
+                    'Pol.End Dt.': '',
+                    'Premium': '',
+                    'Premium GST': '',
+                    'BrokerageRate': '',
+                    'INSURER_TYPE': '',
+                    'INSURER_NAME': '',
+                    'PROPORTION': '',
+                    'BRIEF_DESC': '',
+                    'Curr.': '',
+                    'Curr_Rate': '',
+                    'BROKERAGE_FEE_DUE': '',
+                    'iTrack No.': '',
+                    'FinanceSPOC': '',
+                    'Grouping': '',
+                    'Due Date': '',
+                    'Overdue': ''
+                }
 
-            # Negative entry: Bank Account
-            negative_entry = {
-                'EntryNo': entry_no + 1,
-                'DocumentNo': document_no,
-                'LineNo': 2,
-                'AccountType': 'Bank Account',
-                'AccountNo': 2600005,
-                'PostingDate': posting_date,
-                'Amount': -debit_amt_positive,
-                'Narration': description,
-                'NatureofTransaction': 'Bank Payment',
-                # Fill other columns with empty strings
-                'ReceiptType': '',
-                'CurrencyCode': '',
-                'CurrencyRate': '',
-                'ExternalDocumentNo': '',
-                'BranchDimensionCode': '',
-                'CoverNo': '',
-                'InsuranceBranch': '',
-                'MarshBranch': '',
-                'Department': '',
-                'ServicerID': '',
-                'CE Name': '',
-                'ClientName': '',
-                'PolicyNo': '',
-                'EndorsementNo': '',
-                'Risk': '',
-                'ASP_PRACTICE': '',
-                'IncomeCategory': '',
-                'PolInceptionDate': '',
-                'Pol.End Dt.': '',
-                'Premium': '',
-                'Premium GST': '',
-                'BrokerageRate': '',
-                'INSURER_TYPE': '',
-                'INSURER_NAME': '',
-                'PROPORTION': '',
-                'BRIEF_DESC': '',
-                'Curr.': '',
-                'Curr_Rate': '',
-                'BROKERAGE_FEE_DUE': '',
-                'iTrack No.': '',
-                'FinanceSPOC': '',
-                'Grouping': '',
-                'Due Date': '',
-                'Overdue': ''
-            }
+                # Negative entry: to_account
+                negative_entry = {
+                    'EntryNo': entry_no + 1,
+                    'DocumentNo': document_no,
+                    'LineNo': 2,
+                    'AccountType': 'Bank Account',
+                    'AccountNo': to_account,
+                    'PostingDate': posting_date,
+                    'Amount': debit_amt_positive,
+                    'Narration': description,
+                    'NatureofTransaction': 'Bank Payment',
+                    # Fill other columns with empty strings
+                    'ReceiptType': '',
+                    'CurrencyCode': '',
+                    'CurrencyRate': '',
+                    'ExternalDocumentNo': '',
+                    'BranchDimensionCode': '',
+                    'CoverNo': '',
+                    'InsuranceBranch': '',
+                    'MarshBranch': '',
+                    'Department': '',
+                    'ServicerID': '',
+                    'CE Name': '',
+                    'ClientName': '',
+                    'PolicyNo': '',
+                    'EndorsementNo': '',
+                    'Risk': '',
+                    'ASP_PRACTICE': '',
+                    'IncomeCategory': '',
+                    'PolInceptionDate': '',
+                    'Pol.End Dt.': '',
+                    'Premium': '',
+                    'Premium GST': '',
+                    'BrokerageRate': '',
+                    'INSURER_TYPE': '',
+                    'INSURER_NAME': '',
+                    'PROPORTION': '',
+                    'BRIEF_DESC': '',
+                    'Curr.': '',
+                    'Curr_Rate': '',
+                    'BROKERAGE_FEE_DUE': '',
+                    'iTrack No.': '',
+                    'FinanceSPOC': '',
+                    'Grouping': '',
+                    'Due Date': '',
+                    'Overdue': ''
+                }
+
+            else:  # Bank Charges
+                # Positive entry: G/L Account (same as original behavior)
+                positive_entry = {
+                    'EntryNo': entry_no,
+                    'DocumentNo': document_no,
+                    'LineNo': 1,
+                    'AccountType': 'G/L Account',
+                    'AccountNo': 1500001,  # Hardcoded as per original code
+                    'PostingDate': posting_date,
+                    'Amount': debit_amt_positive,
+                    'Narration': description,
+                    'NatureofTransaction': 'Bank Payment',
+                    # Fill other columns with empty strings
+                    'ReceiptType': '',
+                    'CurrencyCode': '',
+                    'CurrencyRate': '',
+                    'ExternalDocumentNo': '',
+                    'BranchDimensionCode': '',
+                    'CoverNo': '',
+                    'InsuranceBranch': '',
+                    'MarshBranch': '',
+                    'Department': '',
+                    'ServicerID': '',
+                    'CE Name': '',
+                    'ClientName': '',
+                    'PolicyNo': '',
+                    'EndorsementNo': '',
+                    'Risk': '',
+                    'ASP_PRACTICE': '',
+                    'IncomeCategory': '',
+                    'PolInceptionDate': '',
+                    'Pol.End Dt.': '',
+                    'Premium': '',
+                    'Premium GST': '',
+                    'BrokerageRate': '',
+                    'INSURER_TYPE': '',
+                    'INSURER_NAME': '',
+                    'PROPORTION': '',
+                    'BRIEF_DESC': '',
+                    'Curr.': '',
+                    'Curr_Rate': '',
+                    'BROKERAGE_FEE_DUE': '',
+                    'iTrack No.': '',
+                    'FinanceSPOC': '',
+                    'Grouping': '',
+                    'Due Date': '',
+                    'Overdue': ''
+                }
+
+                # Negative entry: Bank Account (same as original behavior)
+                negative_entry = {
+                    'EntryNo': entry_no + 1,
+                    'DocumentNo': document_no,
+                    'LineNo': 2,
+                    'AccountType': 'Bank Account',
+                    'AccountNo': 2600005,  # Hardcoded as per original code
+                    'PostingDate': posting_date,
+                    'Amount': -debit_amt_positive,
+                    'Narration': description,
+                    'NatureofTransaction': 'Bank Payment',
+                    # Fill other columns with empty strings
+                    'ReceiptType': '',
+                    'CurrencyCode': '',
+                    'CurrencyRate': '',
+                    'ExternalDocumentNo': '',
+                    'BranchDimensionCode': '',
+                    'CoverNo': '',
+                    'InsuranceBranch': '',
+                    'MarshBranch': '',
+                    'Department': '',
+                    'ServicerID': '',
+                    'CE Name': '',
+                    'ClientName': '',
+                    'PolicyNo': '',
+                    'EndorsementNo': '',
+                    'Risk': '',
+                    'ASP_PRACTICE': '',
+                    'IncomeCategory': '',
+                    'PolInceptionDate': '',
+                    'Pol.End Dt.': '',
+                    'Premium': '',
+                    'Premium GST': '',
+                    'BrokerageRate': '',
+                    'INSURER_TYPE': '',
+                    'INSURER_NAME': '',
+                    'PROPORTION': '',
+                    'BRIEF_DESC': '',
+                    'Curr.': '',
+                    'Curr_Rate': '',
+                    'BROKERAGE_FEE_DUE': '',
+                    'iTrack No.': '',
+                    'FinanceSPOC': '',
+                    'Grouping': '',
+                    'Due Date': '',
+                    'Overdue': ''
+                }
 
             # Append the entries to processed_entries list
             processed_entries.append(positive_entry)
