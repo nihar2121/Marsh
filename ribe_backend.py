@@ -91,8 +91,7 @@ def process_file(filepath):
     output_files_dir = os.path.join(ri_entries_dir, "Output Files")
     single_files_dir = os.path.join(output_files_dir, "Single Files")
     master_file_dir = os.path.join(output_files_dir, "Master File")
-    support_files_dir = os.path.join(output_files_dir, "support_files")
-    support_file_path = os.path.join(support_files_dir, "support_file.xlsx")
+    support_files_dir = os.path.join(output_files_dir, "support_files")  # Added for support files
 
     # Create directories if they don't exist
     os.makedirs(single_files_dir, exist_ok=True)
@@ -119,10 +118,15 @@ def process_file(filepath):
     else:
         raise ValueError("Filename does not start with a valid prefix (e.g., 'citi013').")
     
-    # Load the support_file.xlsx and retrieve base_account and to_account
+    # -------------------- Added Code Starts Here --------------------
+    # Define the path to the support file
+    support_file_path = os.path.join(output_files_dir, "support_files", "support_file.xlsx")
+    
+    # Check if the support file exists
     if not os.path.exists(support_file_path):
         raise FileNotFoundError(f"Support file not found at: {support_file_path}")
     
+    # Load the support file Sheet2
     support_df = pd.read_excel(support_file_path, sheet_name='Sheet2')
     
     # Ensure required columns exist in support file
@@ -131,22 +135,30 @@ def process_file(filepath):
         if col not in support_df.columns:
             raise ValueError(f"Missing required column in support file: {col}")
     
-    # Filter support_df for the current prefix
+    # Filter support_df for the current prefix_raw
     support_filtered = support_df[support_df['lookup_account'] == prefix_raw]
-    if support_filtered.empty:
-        raise ValueError(f"No matching lookup_account found for prefix: {prefix_raw}")
     
-    # Create a dictionary for category to account mapping
-    category_account_mapping = {}
+    if support_filtered.empty:
+        raise ValueError(f"No support file entry found for account: {prefix_raw}")
+    
+    # Create a dictionary mapping category to (base_account, to_account)
+    account_mapping = {}
     for _, row in support_filtered.iterrows():
         category = row['category']
         base_account = row['base_account']
         to_account = row['to_account']
-        category_account_mapping[category] = {
+        account_mapping[category] = {
             'base_account': base_account,
             'to_account': to_account
         }
     
+    # Verify that all required categories are present in the support file
+    required_categories = ["Payment", "Receipt", "Bank Charges", "Brokerage Transfer"]
+    for cat in required_categories:
+        if cat not in account_mapping:
+            raise ValueError(f"Category '{cat}' not found in support file for account: {prefix_raw}")
+    # --------------------- Added Code Ends Here ---------------------
+
     # Initialize list to collect new entries
     processed_entries = []
 
@@ -192,14 +204,13 @@ def process_file(filepath):
             month_abbr = 'Unknown'
             posting_date = ''
 
-        # Retrieve account numbers from the mapping
-        if category not in category_account_mapping:
-            # If the category is not defined in the support file, skip processing
+        # Retrieve base_account and to_account based on category from the support file
+        if category in account_mapping:
+            base_account = account_mapping[category]['base_account']
+            to_account = account_mapping[category]['to_account']
+        else:
+            # If category is not one of the required, skip processing
             continue
-        
-        accounts = category_account_mapping[category]
-        base_account = accounts['base_account']
-        to_account = accounts['to_account']
 
         if category == "Receipt":
             # DocumentNo: {prefix}/BR/{Month}/Counter
@@ -211,8 +222,8 @@ def process_file(filepath):
                 'EntryNo': entry_no,
                 'DocumentNo': document_no,
                 'LineNo': 1,
-                'AccountType': 'Base Account',  # Updated AccountType if needed
-                'AccountNo': base_account,
+                'AccountType': 'Bank Account',
+                'AccountNo': base_account,  # Changed from 2600005
                 'PostingDate': posting_date,
                 'Amount': credit_amt,
                 'Narration': description,
@@ -259,8 +270,8 @@ def process_file(filepath):
                 'EntryNo': entry_no + 1,
                 'DocumentNo': document_no,
                 'LineNo': 2,
-                'AccountType': 'To Account',  # Updated AccountType if needed
-                'AccountNo': to_account,
+                'AccountType': 'G/L Account',
+                'AccountNo': to_account,  # Changed from 1500001
                 'PostingDate': posting_date,
                 'Amount': -credit_amt,
                 'Narration': description,
@@ -310,7 +321,7 @@ def process_file(filepath):
             br_counter += 1
             entry_no += 2
 
-        elif category in ["Payment", "Bank Charges", "Brokerage Transfer"]:
+        elif category in ["Payment", "Bank Charges"]:
             # DocumentNo: {prefix}/BP/{Month}/Counter
             doc_prefix = "BP"
             document_no = f"{prefix_formatted}/{doc_prefix}/{month_abbr}/{bp_counter:03d}"
@@ -323,8 +334,8 @@ def process_file(filepath):
                 'EntryNo': entry_no,
                 'DocumentNo': document_no,
                 'LineNo': 1,
-                'AccountType': 'To Account',  # Updated AccountType if needed
-                'AccountNo': to_account,
+                'AccountType': 'G/L Account',
+                'AccountNo': to_account,  # Changed from 1500001
                 'PostingDate': posting_date,
                 'Amount': debit_amt_positive,
                 'Narration': description,
@@ -371,12 +382,124 @@ def process_file(filepath):
                 'EntryNo': entry_no + 1,
                 'DocumentNo': document_no,
                 'LineNo': 2,
-                'AccountType': 'Base Account',  # Updated AccountType if needed
-                'AccountNo': base_account,
+                'AccountType': 'Bank Account',
+                'AccountNo': base_account,  # Changed from 2600005
                 'PostingDate': posting_date,
                 'Amount': -debit_amt_positive,
                 'Narration': description,
                 'NatureofTransaction': 'Bank Payment',
+                # Fill other columns with empty strings
+                'ReceiptType': '',
+                'CurrencyCode': '',
+                'CurrencyRate': '',
+                'ExternalDocumentNo': '',
+                'BranchDimensionCode': '',
+                'CoverNo': '',
+                'InsuranceBranch': '',
+                'MarshBranch': '',
+                'Department': '',
+                'ServicerID': '',
+                'CE Name': '',
+                'ClientName': '',
+                'PolicyNo': '',
+                'EndorsementNo': '',
+                'Risk': '',
+                'ASP_PRACTICE': '',
+                'IncomeCategory': '',
+                'PolInceptionDate': '',
+                'Pol.End Dt.': '',
+                'Premium': '',
+                'Premium GST': '',
+                'BrokerageRate': '',
+                'INSURER_TYPE': '',
+                'INSURER_NAME': '',
+                'PROPORTION': '',
+                'BRIEF_DESC': '',
+                'Curr.': '',
+                'Curr_Rate': '',
+                'BROKERAGE_FEE_DUE': '',
+                'iTrack No.': '',
+                'FinanceSPOC': '',
+                'Grouping': '',
+                'Due Date': '',
+                'Overdue': ''
+            }
+
+            # Append the entries to processed_entries list
+            processed_entries.append(positive_entry)
+            processed_entries.append(negative_entry)
+
+            # Increment counters
+            bp_counter += 1
+            entry_no += 2
+
+        elif category == "Brokerage Transfer":
+            # DocumentNo: {prefix}/BP/{Month}/Counter
+            doc_prefix = "BP"
+            document_no = f"{prefix_formatted}/{doc_prefix}/{month_abbr}/{bp_counter:03d}"
+
+            # Ensure debit_amt is positive
+            debit_amt_positive = abs(debit_amt) if pd.notna(debit_amt) else 0
+
+            # Positive entry: to_account
+            positive_entry = {
+                'EntryNo': entry_no,
+                'DocumentNo': document_no,
+                'LineNo': 1,
+                'AccountType': 'Bank Account',
+                'AccountNo': to_account,  # Changed from 2600005
+                'PostingDate': posting_date,
+                'Amount': debit_amt_positive,
+                'Narration': description,
+                'NatureofTransaction': 'Contra',
+                # Fill other columns with empty strings
+                'ReceiptType': '',
+                'CurrencyCode': '',
+                'CurrencyRate': '',
+                'ExternalDocumentNo': '',
+                'BranchDimensionCode': '',
+                'CoverNo': '',
+                'InsuranceBranch': '',
+                'MarshBranch': '',
+                'Department': '',
+                'ServicerID': '',
+                'CE Name': '',
+                'ClientName': '',
+                'PolicyNo': '',
+                'EndorsementNo': '',
+                'Risk': '',
+                'ASP_PRACTICE': '',
+                'IncomeCategory': '',
+                'PolInceptionDate': '',
+                'Pol.End Dt.': '',
+                'Premium': '',
+                'Premium GST': '',
+                'BrokerageRate': '',
+                'INSURER_TYPE': '',
+                'INSURER_NAME': '',
+                'PROPORTION': '',
+                'BRIEF_DESC': '',
+                'Curr.': '',
+                'Curr_Rate': '',
+                'BROKERAGE_FEE_DUE': '',
+                'iTrack No.': '',
+                'FinanceSPOC': '',
+                'Grouping': '',
+                'Due Date': '',
+                'Overdue': ''
+            }
+
+            # Negative entry: base_account
+            negative_entry = {
+                'EntryNo': entry_no + 1,
+                'DocumentNo': document_no,
+                'LineNo': 2,
+                'AccountType': 'G/L Account',
+                'AccountNo': base_account,  # Changed from 1500001
+                'PostingDate': posting_date,
+                'Amount': -debit_amt_positive,
+                'Narration': description,
+                'NatureofTransaction': 'Contra',
                 # Fill other columns with empty strings
                 'ReceiptType': '',
                 'CurrencyCode': '',
