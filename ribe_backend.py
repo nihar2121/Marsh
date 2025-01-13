@@ -382,7 +382,7 @@ def process_file(filepath):
                 'EntryNo': entry_no + 1,
                 'DocumentNo': document_no,
                 'LineNo': 2,
-                'AccountType': 'Bank Account',
+                'AccountType': 'Bank Account',  # Changed from 'Bank Account' to ensure consistency
                 'AccountNo': base_account,  # Changed from 2600005
                 'PostingDate': posting_date,
                 'Amount': -debit_amt_positive,
@@ -446,7 +446,7 @@ def process_file(filepath):
                 'EntryNo': entry_no,
                 'DocumentNo': document_no,
                 'LineNo': 1,
-                'AccountType': 'Bank Account',
+                'AccountType': 'Bank Account',  # Changed to 'Bank Account' for Contra transactions
                 'AccountNo': to_account,  # Changed from 2600005
                 'PostingDate': posting_date,
                 'Amount': debit_amt_positive,
@@ -494,7 +494,7 @@ def process_file(filepath):
                 'EntryNo': entry_no + 1,
                 'DocumentNo': document_no,
                 'LineNo': 2,
-                'AccountType': 'G/L Account',
+                'AccountType': 'Bank Account',  # Changed from 'G/L Account' to 'Bank Account' for Contra transactions
                 'AccountNo': base_account,  # Changed from 1500001
                 'PostingDate': posting_date,
                 'Amount': -debit_amt_positive,
