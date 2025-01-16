@@ -860,14 +860,13 @@ def process_united_india_insurance(
                 else:
                     processed_df[template_col] = ''
 
-            # === Correctly format 'Policy End Date' and 'Policy Start Date' (no day subtracted now) ===
+            # === Correctly format 'Policy End Date' and 'Policy Start Date' 
+            #     (parse_date_flexible returns a dd/mm/yyyy string directly) ===
             date_columns = ['Policy End Date', 'Policy Start Date']
             for column in date_columns:
                 if column in processed_df.columns:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(
-                        lambda x: x.strftime('%d/%m/%Y') if (not pd.isnull(x) and x != '') else ''
-                    )
+                    # We do NOT call .strftime() again — parse_date_flexible already returns a string
                     processed_df[column] = processed_df[column].fillna('')
 
             # Create necessary columns
@@ -950,7 +949,14 @@ def process_united_india_insurance(
             sum_brokerage = processed_df['Brokerage'].astype(float).sum()
 
             # --- Table_4 processing (closest row match) ---
-            table_4['Amount_cleaned'] = table_4['Amount'].astype(str).str.replace(',', '').astype(float)
+            table_4['Amount_cleaned'] = (
+                table_4['Amount']
+                .astype(str)
+                .str.replace(',', '')
+                .str.replace('(', '')
+                .str.replace(')', '')
+                .astype(float)
+            )
             table_4['Brokerage_Diff'] = abs(table_4['Amount_cleaned'] - sum_brokerage)
             amount_matching_row_index = table_4['Brokerage_Diff'].idxmin()
             amount_matching_row = table_4.loc[amount_matching_row_index]
@@ -994,8 +1000,14 @@ def process_united_india_insurance(
                 (table_5_temp['SupplierState'].str.strip() != '')
             ].reset_index(drop=True)
 
+            # Make sure parentheses are removed from 'TotalTaxAmt'
             table_5_temp['TotalTaxAmt_cleaned'] = (
-                table_5_temp['TotalTaxAmt'].astype(str).str.replace(',', '').astype(float)
+                table_5_temp['TotalTaxAmt']
+                .astype(str)
+                .str.replace(',', '')
+                .str.replace('(', '')
+                .str.replace(')', '')
+                .astype(float)
             )
 
             # We want to see if there's a set (or the entire table_5_temp) that sums to sum_brokerage
@@ -1014,7 +1026,6 @@ def process_united_india_insurance(
 
             else:
                 # If no direct match, fallback to single closest row logic
-                # (original approach: find single row with minimal difference)
                 table_5_temp['Brokerage_Diff'] = abs(table_5_temp['TotalTaxAmt_cleaned'] - sum_brokerage)
                 matching_row_index = table_5_temp['Brokerage_Diff'].idxmin()
                 matching_row = table_5_temp.loc[matching_row_index]
@@ -1061,8 +1072,22 @@ def process_united_india_insurance(
             else:
                 raise ValueError("Neither 'GST TDS' nor 'GST TDS @2%' column found in table_3")
 
-            table_3['TotalTaxAmt_cleaned'] = table_3[total_tax_amt_col].astype(str).str.replace(',', '').astype(float)
-            table_3['GST TDS_cleaned'] = table_3[gst_tds_col].astype(str).str.replace(',', '').astype(float)
+            table_3['TotalTaxAmt_cleaned'] = (
+                table_3[total_tax_amt_col]
+                .astype(str)
+                .str.replace(',', '')
+                .str.replace('(', '')
+                .str.replace(')', '')
+                .astype(float)
+            )
+            table_3['GST TDS_cleaned'] = (
+                table_3[gst_tds_col]
+                .astype(str)
+                .str.replace(',', '')
+                .str.replace('(', '')
+                .str.replace(')', '')
+                .astype(float)
+            )
             table_3['Brokerage_Diff'] = abs(table_3['TotalTaxAmt_cleaned'] - sum_brokerage)
             gst_tds_matching_row_index = table_3['Brokerage_Diff'].idxmin()
             gst_tds_matching_row = table_3.loc[gst_tds_matching_row_index]
@@ -1075,17 +1100,11 @@ def process_united_india_insurance(
                 date_col_formatted = ''
 
             # Check if GST is present in this attached data
-            # Instead of checking columns only, let's do a broader check
-            # We'll look at column names or any row values that contain "GST" or "GST @18%"
-            # to be safe. If found => with GST; else => without GST.
-            # The simplest approach: check column names
             col_has_gst = any(
                 re.search(r'(?i)\bgst\b', str(col)) or re.search(r'(?i)gst\s*@?18%', str(col))
                 for col in df.columns
             )
-            # Or check data values if needed:
             row_has_gst = df.applymap(lambda x: 'gst' in str(x).lower() if isinstance(x, str) else False).any().any()
-
             gst_present = col_has_gst or row_has_gst
 
             if gst_present:
@@ -2256,11 +2275,12 @@ def process_icici_lombard_insurance(file_path, template_data, risk_code_data, cu
 def parse_date_flexible(date_str):
     """
     A flexible date parser that handles:
-    - Excel numeric dates (no day subtraction).
+    - Excel numeric dates (NO day subtraction).
     - 'YYYYMMDD' numeric format.
     - Common string formats: '%d-%b-%y', '%d/%m/%Y', '%Y-%m-%d', etc.
 
     Returns a string in 'dd/mm/yyyy' if successfully parsed, else ''.
+    NOTE: We do NOT shift by -1 day anywhere. 
     """
     if pd.isnull(date_str) or date_str == '':
         return ''  # Return empty for null or empty strings
@@ -2284,7 +2304,7 @@ def parse_date_flexible(date_str):
                 return date_obj.strftime('%d/%m/%Y')
             except ValueError:
                 return ''
-        return ''  # If numeric but not in valid range
+        return ''  # If numeric but not in a valid range
 
     # 3) If it's a string
     if isinstance(date_str, str):
@@ -2295,7 +2315,7 @@ def parse_date_flexible(date_str):
             '%d-%m-%Y', '%d/%m/%y', '%Y%m%d'
         ]
 
-        # Try known formats first
+        # Try known formats first on the cleaned string
         for fmt in date_formats:
             try:
                 parsed_obj = datetime.strptime(date_str_cleaned, fmt)
@@ -2312,6 +2332,7 @@ def parse_date_flexible(date_str):
 
     # If none of the above matched, return empty
     return ''
+
 def process_star_health_insurer(file_path, template_data, risk_code_data, cust_neft_data, table_3, table_4, table_5, subject, mappings):
 
     try:
