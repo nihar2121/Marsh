@@ -6,7 +6,7 @@ from datetime import datetime
 
 def process_file(filepath):
     """
-    Processes the uploaded transaction file, categorizes transactions,
+    Processes the uploaded transaction file (CITI or HSBC), categorizes transactions,
     and generates a final output file based on 'Receipt', 'Payment',
     'Bank Charges', and 'Brokerage Transfer' categories.
 
@@ -23,16 +23,65 @@ def process_file(filepath):
     else:
         df = pd.read_excel(filepath)
     
-    # Ensure the relevant columns exist
-    required_columns = ['DESCRIPTION', 'DEBIT AMT', 'CREDIT AMT', 'DATE']
-    for col in required_columns:
-        if col not in df.columns:
-            raise ValueError(f"Missing required column: {col}")
+    # Extract prefix from the file name to determine bank type
+    filename = os.path.basename(filepath)
+    filename_lower = filename.lower()
+    bank_match = re.match(r'^(citi|hsbc)(\d{3})', filename_lower)
+    if not bank_match:
+        raise ValueError("Filename does not start with a valid prefix (e.g., 'citi013' or 'hsbc002').")
+    
+    bank_type = bank_match.group(1).upper()  # 'CITI' or 'HSBC'
+    account_number = bank_match.group(2)     # e.g., '013' or '002'
+    prefix_formatted = f"{bank_type}/{account_number}"
+    
+    # -------------------- Column Mapping Starts Here --------------------
+    if bank_type == "CITI":
+        # Required columns for CITI
+        required_columns = ['DESCRIPTION', 'DEBIT AMT', 'CREDIT AMT', 'DATE']
+        for col in required_columns:
+            if col not in df.columns:
+                raise ValueError(f"Missing required column for CITI file: {col}")
+        
+        # Convert 'DEBIT AMT' and 'CREDIT AMT' to numeric, coercing errors to NaN
+        df['DEBIT AMT'] = pd.to_numeric(df['DEBIT AMT'], errors='coerce')
+        df['CREDIT AMT'] = pd.to_numeric(df['CREDIT AMT'], errors='coerce')
+        
+    elif bank_type == "HSBC":
+        # Mapping HSBC columns to standard columns
+        hsbc_column_mapping = {
+            'Acc name': 'ACCOUNT_NAME',
+            'Account number': 'ACCOUNT_NUMBER',
+            'Bank name': 'BANK_NAME',
+            'Currency': 'CURRENCY',
+            'Bank reference': 'BANK_REFERENCE',
+            'Additional narrative': 'ADDITIONAL_NARRATIVE',
+            'Customer reference': 'CUSTOMER_REFERENCE',
+            'TRN type': 'TRN_TYPE',
+            'Value date (dd/mm/yyyy)': 'VALUE_DATE',
+            'Credit amount': 'CREDIT_AMT',
+            'Debit amount': 'DEBIT_AMT',
+            'Balance': 'BALANCE',
+            'Time': 'TIME',
+            'Post date': 'POST_DATE',
+            'Brokerage Transfer': 'BROKERAGE_TRANSFER'
+        }
+        
+        df.rename(columns=hsbc_column_mapping, inplace=True)
+        
+        # Required columns for HSBC
+        required_columns = ['CUSTOMER_REFERENCE', 'ADDITIONAL_NARRATIVE', 'TRN_TYPE',
+                            'POST_DATE', 'CREDIT_AMT', 'DEBIT_AMT']
+        for col in required_columns:
+            if col not in df.columns:
+                raise ValueError(f"Missing required column for HSBC file: {col}")
+        
+        # Convert 'DEBIT_AMT' and 'CREDIT_AMT' to numeric, coercing errors to NaN
+        df['DEBIT_AMT'] = pd.to_numeric(df['DEBIT_AMT'].astype(str).str.replace(',', ''), errors='coerce')
+        df['CREDIT_AMT'] = pd.to_numeric(df['CREDIT_AMT'].astype(str).str.replace(',', ''), errors='coerce')
+        
+    # --------------------- Column Mapping Ends Here ---------------------
 
-    # Convert 'DEBIT AMT' and 'CREDIT AMT' to numeric, coercing errors to NaN
-    df['DEBIT AMT'] = pd.to_numeric(df['DEBIT AMT'], errors='coerce')
-    df['CREDIT AMT'] = pd.to_numeric(df['CREDIT AMT'], errors='coerce')
-
+    # -------------------- Categorization Function Starts Here --------------------
     def assign_category(row):
         """
         Assigns a category to each transaction based on its description and amounts.
@@ -43,28 +92,66 @@ def process_file(filepath):
         Returns:
             str: The assigned category.
         """
-        desc = str(row.get('DESCRIPTION', '')).lower()
-        debit_amt = row.get('DEBIT AMT', 0)
-        credit_amt = row.get('CREDIT AMT', 0)
+        if bank_type == "CITI":
+            desc = str(row.get('DESCRIPTION', '')).lower()
+            debit_amt = row.get('DEBIT AMT', 0)
+            credit_amt = row.get('CREDIT AMT', 0)
 
-        # 1) Check keywords in DESCRIPTION first
-        if 'brokerage transfer' in desc:
-            return "Brokerage Transfer"
-        if 'taxes and cess' in desc:
-            return "Bank Charges"
-        if 'billing invoice paid' in desc:
-            return "Bank Charges"
-        if 'outgoing' in desc:
-            return "Payment"
+            # 1) Check keywords in DESCRIPTION first
+            if 'brokerage transfer' in desc:
+                return "Brokerage Transfer"
+            if 'taxes and cess' in desc:
+                return "Bank Charges"
+            if 'billing invoice paid' in desc:
+                return "Bank Charges"
+            if 'outgoing' in desc:
+                return "Payment"
 
-        # 2) If none of the description keywords matched, 
-        #    then check if this is a credit => "Receipt"
-        #    (Non-empty credit and presumably no debit)
-        if pd.notna(credit_amt) and credit_amt != 0 and (pd.isna(debit_amt) or debit_amt == 0):
-            return "Receipt"
+            # 2) If none of the description keywords matched, 
+            #    then check if this is a credit => "Receipt"
+            if pd.notna(credit_amt) and credit_amt != 0 and (pd.isna(debit_amt) or debit_amt == 0):
+                return "Receipt"
 
-        # 3) Default category if no other conditions matched
-        return ""
+            # 3) Default category if no other conditions matched
+            return ""
+
+        elif bank_type == "HSBC":
+            credit_amt = row.get('CREDIT_AMT', 0)
+            debit_amt = row.get('DEBIT_AMT', 0)
+            customer_ref = str(row.get('CUSTOMER_REFERENCE', '')).lower()
+            additional_narrative = str(row.get('ADDITIONAL_NARRATIVE', '')).lower()
+            trn_type = str(row.get('TRN_TYPE', '')).lower()
+
+            # 1) Brokerage Transfer categorization
+            brokerage_transfer_keywords = [
+                "brokerage trnsfr",
+                "brokerge trnsfer",
+                "brokerage trnsfr",
+                "brokerge transfr",
+                "brokrage transfr",
+                "brokrage trnfer",
+                "brokerage tsf"
+            ]
+            if (customer_ref in brokerage_transfer_keywords) or \
+               ('brokerage' in additional_narrative) or \
+               ('3402140005' in str(row.get('BROKERAGE_TRANSFER', ''))):
+                return "Brokerage Transfer"
+
+            # 2) Receipt
+            if pd.notna(credit_amt) and credit_amt != 0:
+                return "Receipt"
+
+            # 3) Bank Charges
+            if trn_type in ['charges', 'debit']:
+                return "Bank Charges"
+
+            # 4) Payment
+            if trn_type == 'transfer':
+                return "Payment"
+
+            # 5) Default
+            return ""
+    # --------------------- Categorization Function Ends Here ---------------------
 
     # Create the Category column
     df["Category"] = df.apply(assign_category, axis=1)
@@ -108,17 +195,7 @@ def process_file(filepath):
         # Initialize an empty DataFrame with the same columns as sample_df
         master_df = pd.DataFrame(columns=sample_df.columns.tolist())
 
-    # Extract prefix from the file name
-    filename = os.path.basename(filepath)
-    filename_lower = filename.lower()
-    match = re.match(r'^(citi\d{3})', filename_lower)
-    if match:
-        prefix_raw = match.group(1)
-        prefix_formatted = f"{prefix_raw[:4].upper()}/{prefix_raw[4:]}"  # 'citi013' → 'CITI/013'
-    else:
-        raise ValueError("Filename does not start with a valid prefix (e.g., 'citi013').")
-    
-    # -------------------- Added Code Starts Here --------------------
+    # -------------------- Support File Handling Starts Here --------------------
     # Define the path to the support file
     support_file_path = os.path.join(output_files_dir, "support_files", "support_file.xlsx")
     
@@ -135,11 +212,11 @@ def process_file(filepath):
         if col not in support_df.columns:
             raise ValueError(f"Missing required column in support file: {col}")
     
-    # Filter support_df for the current prefix_raw
-    support_filtered = support_df[support_df['lookup_account'] == prefix_raw]
+    # Filter support_df for the current account number
+    support_filtered = support_df[support_df['lookup_account'] == account_number]
     
     if support_filtered.empty:
-        raise ValueError(f"No support file entry found for account: {prefix_raw}")
+        raise ValueError(f"No support file entry found for account: {account_number}")
     
     # Create a dictionary mapping category to (base_account, to_account)
     account_mapping = {}
@@ -156,8 +233,8 @@ def process_file(filepath):
     required_categories = ["Payment", "Receipt", "Bank Charges", "Brokerage Transfer"]
     for cat in required_categories:
         if cat not in account_mapping:
-            raise ValueError(f"Category '{cat}' not found in support file for account: {prefix_raw}")
-    # --------------------- Added Code Ends Here ---------------------
+            raise ValueError(f"Category '{cat}' not found in support file for account: {account_number}")
+    # --------------------- Support File Handling Ends Here ---------------------
 
     # Initialize list to collect new entries
     processed_entries = []
@@ -168,11 +245,11 @@ def process_file(filepath):
     # Iterate through each row in the DataFrame
     for index, row in df.iterrows():
         category = row['Category']
-        description = row['DESCRIPTION']
+        description = row['DESCRIPTION'] if bank_type == "CITI" else row.get('ADDITIONAL_NARRATIVE', '')
         debit_amt = row['DEBIT AMT']
         credit_amt = row['CREDIT AMT']
-        date = row['DATE']
-
+        date = row['DATE'] if bank_type == "CITI" else row.get('POST_DATE', row.get('VALUE_DATE', ''))
+        
         # Check if description already exists in master narrations
         if pd.isna(description) or description.lower().strip() in existing_narrations:
             # Skip processing this row
@@ -182,7 +259,10 @@ def process_file(filepath):
         if pd.notna(date):
             if isinstance(date, str):
                 try:
-                    date_parsed = datetime.strptime(date, '%d.%b %Y')  # Assuming format '02.NOV 2024'
+                    if bank_type == "CITI":
+                        date_parsed = datetime.strptime(date, '%d.%b %Y')  # Assuming format '02.NOV 2024'
+                    elif bank_type == "HSBC":
+                        date_parsed = datetime.strptime(date, '%d/%m/%Y')  # Assuming format '03/01/2024'
                 except ValueError:
                     try:
                         date_parsed = pd.to_datetime(date, dayfirst=True)
@@ -223,7 +303,7 @@ def process_file(filepath):
                 'DocumentNo': document_no,
                 'LineNo': 1,
                 'AccountType': 'Bank Account',
-                'AccountNo': base_account,  # Changed from 2600005
+                'AccountNo': base_account,
                 'PostingDate': posting_date,
                 'Amount': credit_amt,
                 'Narration': description,
@@ -262,7 +342,8 @@ def process_file(filepath):
                 'FinanceSPOC': '',
                 'Grouping': '',
                 'Due Date': '',
-                'Overdue': ''
+                'Overdue': '',
+                'Post Date': posting_date if bank_type == "HSBC" else ''
             }
 
             # Negative entry: to_account
@@ -271,7 +352,7 @@ def process_file(filepath):
                 'DocumentNo': document_no,
                 'LineNo': 2,
                 'AccountType': 'G/L Account',
-                'AccountNo': to_account,  # Changed from 1500001
+                'AccountNo': to_account,
                 'PostingDate': posting_date,
                 'Amount': -credit_amt,
                 'Narration': description,
@@ -310,7 +391,8 @@ def process_file(filepath):
                 'FinanceSPOC': '',
                 'Grouping': '',
                 'Due Date': '',
-                'Overdue': ''
+                'Overdue': '',
+                'Post Date': posting_date if bank_type == "HSBC" else ''
             }
 
             # Append the entries to processed_entries list
@@ -335,7 +417,7 @@ def process_file(filepath):
                 'DocumentNo': document_no,
                 'LineNo': 1,
                 'AccountType': 'G/L Account',
-                'AccountNo': to_account,  # Changed from 1500001
+                'AccountNo': to_account,
                 'PostingDate': posting_date,
                 'Amount': debit_amt_positive,
                 'Narration': description,
@@ -374,7 +456,8 @@ def process_file(filepath):
                 'FinanceSPOC': '',
                 'Grouping': '',
                 'Due Date': '',
-                'Overdue': ''
+                'Overdue': '',
+                'Post Date': posting_date if bank_type == "HSBC" else ''
             }
 
             # Negative entry: base_account
@@ -382,8 +465,8 @@ def process_file(filepath):
                 'EntryNo': entry_no + 1,
                 'DocumentNo': document_no,
                 'LineNo': 2,
-                'AccountType': 'Bank Account',  # Changed from 'Bank Account' to ensure consistency
-                'AccountNo': base_account,  # Changed from 2600005
+                'AccountType': 'Bank Account',
+                'AccountNo': base_account,
                 'PostingDate': posting_date,
                 'Amount': -debit_amt_positive,
                 'Narration': description,
@@ -422,7 +505,8 @@ def process_file(filepath):
                 'FinanceSPOC': '',
                 'Grouping': '',
                 'Due Date': '',
-                'Overdue': ''
+                'Overdue': '',
+                'Post Date': posting_date if bank_type == "HSBC" else ''
             }
 
             # Append the entries to processed_entries list
@@ -446,8 +530,8 @@ def process_file(filepath):
                 'EntryNo': entry_no,
                 'DocumentNo': document_no,
                 'LineNo': 1,
-                'AccountType': 'Bank Account',  # Changed to 'Bank Account' for Contra transactions
-                'AccountNo': to_account,  # Changed from 2600005
+                'AccountType': 'Bank Account',  # Contra transactions
+                'AccountNo': to_account,
                 'PostingDate': posting_date,
                 'Amount': debit_amt_positive,
                 'Narration': description,
@@ -486,7 +570,8 @@ def process_file(filepath):
                 'FinanceSPOC': '',
                 'Grouping': '',
                 'Due Date': '',
-                'Overdue': ''
+                'Overdue': '',
+                'Post Date': posting_date if bank_type == "HSBC" else ''
             }
 
             # Negative entry: base_account
@@ -494,8 +579,8 @@ def process_file(filepath):
                 'EntryNo': entry_no + 1,
                 'DocumentNo': document_no,
                 'LineNo': 2,
-                'AccountType': 'Bank Account',  # Changed from 'G/L Account' to 'Bank Account' for Contra transactions
-                'AccountNo': base_account,  # Changed from 1500001
+                'AccountType': 'Bank Account',  # Contra transactions
+                'AccountNo': base_account,
                 'PostingDate': posting_date,
                 'Amount': -debit_amt_positive,
                 'Narration': description,
@@ -534,7 +619,8 @@ def process_file(filepath):
                 'FinanceSPOC': '',
                 'Grouping': '',
                 'Due Date': '',
-                'Overdue': ''
+                'Overdue': '',
+                'Post Date': posting_date if bank_type == "HSBC" else ''
             }
 
             # Append the entries to processed_entries list
@@ -591,6 +677,11 @@ def process_file(filepath):
         if 'PostingDate' in sample_columns:
             date_col_idx = sample_columns.index('PostingDate')
             worksheet.set_column(date_col_idx, date_col_idx, 15, date_fmt)
+        
+        # If 'Post Date' exists, format it as well
+        if 'Post Date' in sample_columns:
+            post_date_col_idx = sample_columns.index('Post Date')
+            worksheet.set_column(post_date_col_idx, post_date_col_idx, 15, date_fmt)
         
     # Append to Master File
     # Append the new entries to master_df
