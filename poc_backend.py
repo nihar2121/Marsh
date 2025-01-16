@@ -1277,7 +1277,7 @@ def process_united_india_insurance(
 
 
 def process_tata_aia_insurance(file_path, template_data, risk_code_data, cust_neft_data, table_3, table_4, table_5, subject, mappings):
-    try:
+
         # Read the file based on its extension, assuming the first row is the header
         file_extension = os.path.splitext(file_path)[1].lower()
 
@@ -2255,55 +2255,63 @@ def process_icici_lombard_insurance(file_path, template_data, risk_code_data, cu
 
 def parse_date_flexible(date_str):
     """
-    A flexible date parser that handles multiple formats, including 'YYYYMMDD'.
-    Removes the "-1" offset for Excel numeric dates to avoid subtracting 1 day.
+    A flexible date parser that handles:
+    - Excel numeric dates (no day subtraction).
+    - 'YYYYMMDD' numeric format.
+    - Common string formats: '%d-%b-%y', '%d/%m/%Y', '%Y-%m-%d', etc.
+
+    Returns a string in 'dd/mm/yyyy' if successfully parsed, else ''.
     """
     if pd.isnull(date_str) or date_str == '':
         return ''  # Return empty for null or empty strings
 
+    # 1) If it's already a datetime, just format it
+    if isinstance(date_str, datetime):
+        return date_str.strftime('%d/%m/%Y')
+
+    # 2) If it's numeric (Excel date or YYYYMMDD)
     if isinstance(date_str, (float, int)):
-        # Handle Excel numeric dates and 'YYYYMMDD' integer format
         date_int = int(date_str)
-        # If in a typical Excel date range
-        if date_int > 59 and date_int < 2958465:
-            # Excel date format: we no longer subtract 1 day
-            # so we just do + date_int
-            return datetime(1899, 12, 30) + timedelta(days=date_int)
-        elif 19000101 <= date_int <= 29991231:
-            # 'YYYYMMDD' format
+        # Check typical Excel date range
+        if 59 < date_int < 2958465:
+            # Excel numeric date (no day subtracted)
+            date_obj = datetime(1899, 12, 30) + timedelta(days=date_int)
+            return date_obj.strftime('%d/%m/%Y')
+        # Check for YYYYMMDD range
+        if 19000101 <= date_int <= 29991231:
             try:
-                return datetime.strptime(str(date_int), '%Y%m%d')
+                date_obj = datetime.strptime(str(date_int), '%Y%m%d')
+                return date_obj.strftime('%d/%m/%Y')
             except ValueError:
                 return ''
-        else:
-            return ''
-    elif isinstance(date_str, str):
-        # Remove any non-numeric characters for 'YYYYMMDD' format if the entire string is intended to be 'YYYYMMDD'
+        return ''  # If numeric but not in valid range
+
+    # 3) If it's a string
+    if isinstance(date_str, str):
+        # Remove all non-digits if we suspect 'YYYYMMDD'
         date_str_cleaned = ''.join(filter(str.isdigit, date_str))
         date_formats = [
             '%d-%b-%y', '%d-%b-%Y', '%d/%m/%Y', '%Y-%m-%d',
             '%d-%m-%Y', '%d/%m/%y', '%Y%m%d'
         ]
 
-        # Try each known format on the cleaned string
+        # Try known formats first
         for fmt in date_formats:
             try:
-                return datetime.strptime(date_str_cleaned, fmt)
+                parsed_obj = datetime.strptime(date_str_cleaned, fmt)
+                return parsed_obj.strftime('%d/%m/%Y')
             except ValueError:
-                continue  # Try next format if current fails
+                pass
 
-        # Fallback: Try parsing with pandas' `to_datetime` on the original string
+        # Fallback: try pandas to_datetime on the original string
         try:
-            return pd.to_datetime(date_str, dayfirst=True)
+            parsed_obj = pd.to_datetime(date_str, dayfirst=True)
+            return parsed_obj.strftime('%d/%m/%Y')
         except ValueError:
-            return ''  # Return empty string if parsing fails
+            return ''
 
-    elif isinstance(date_str, datetime):
-        return date_str  # Return the datetime object as is
-
-    else:
-        return ''  # Return empty for any unsupported types
-
+    # If none of the above matched, return empty
+    return ''
 def process_star_health_insurer(file_path, template_data, risk_code_data, cust_neft_data, table_3, table_4, table_5, subject, mappings):
 
     try:
