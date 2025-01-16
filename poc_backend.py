@@ -755,6 +755,76 @@ def process_oriental_insurance_co(file_path, template_data, risk_code_data, cust
         raise
 
 
+import os
+import sys
+import re
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+from dateutil import parser
+
+def parse_date_flexible(date_str):
+    """
+    A flexible date parser that handles:
+    - Excel numeric dates (NO day subtraction).
+    - 'YYYYMMDD' numeric format.
+    - Common string formats: '%d-%b-%y', '%d/%m/%Y', '%Y-%m-%d', etc.
+
+    Returns a string in 'dd/mm/yyyy' if successfully parsed, else ''.
+    NOTE: We do NOT shift by -1 day anywhere.
+    """
+    if pd.isnull(date_str) or date_str == '':
+        return ''  # Return empty for null or empty strings
+
+    # 1) If it's already a datetime, just format it
+    if isinstance(date_str, datetime):
+        return date_str.strftime('%d/%m/%Y')
+
+    # 2) If it's numeric (Excel date or YYYYMMDD)
+    if isinstance(date_str, (float, int)):
+        date_int = int(date_str)
+        # Check typical Excel date range
+        if 59 < date_int < 2958465:
+            # Excel numeric date (no day subtracted)
+            date_obj = datetime(1899, 12, 30) + timedelta(days=date_int)
+            return date_obj.strftime('%d/%m/%Y')
+        # Check for YYYYMMDD range
+        if 19000101 <= date_int <= 29991231:
+            try:
+                date_obj = datetime.strptime(str(date_int), '%Y%m%d')
+                return date_obj.strftime('%d/%m/%Y')
+            except ValueError:
+                return ''
+        return ''  # If numeric but not in a valid range
+
+    # 3) If it's a string
+    if isinstance(date_str, str):
+        # Remove all non-digits if we suspect 'YYYYMMDD'
+        date_str_cleaned = ''.join(filter(str.isdigit, date_str))
+        date_formats = [
+            '%d-%b-%y', '%d-%b-%Y', '%d/%m/%Y', '%Y-%m-%d',
+            '%d-%m-%Y', '%d/%m/%y', '%Y%m%d'
+        ]
+
+        # Try known formats first on the cleaned string
+        for fmt in date_formats:
+            try:
+                parsed_obj = datetime.strptime(date_str_cleaned, fmt)
+                return parsed_obj.strftime('%d/%m/%Y')
+            except ValueError:
+                pass
+
+        # Fallback: try pandas to_datetime on the original string
+        try:
+            parsed_obj = pd.to_datetime(date_str, dayfirst=True)
+            return parsed_obj.strftime('%d/%m/%Y')
+        except ValueError:
+            return ''
+
+    # If none of the above matched, return empty
+    return ''
+
+
 def process_united_india_insurance(
     file_path,
     template_data,
@@ -846,7 +916,6 @@ def process_united_india_insurance(
                 last_row = df.iloc[-1]
                 non_empty_cols = last_row.dropna().index.tolist()
                 premium_brokerage_cols = ['Premium', 'Brokerage']
-                # Check if non-empty columns are subset of premium_brokerage_cols
                 if set(non_empty_cols).issubset(premium_brokerage_cols):
                     df = df.iloc[:-1].reset_index(drop=True)
 
@@ -861,12 +930,10 @@ def process_united_india_insurance(
                     processed_df[template_col] = ''
 
             # === Correctly format 'Policy End Date' and 'Policy Start Date' 
-            #     (parse_date_flexible returns a dd/mm/yyyy string directly) ===
             date_columns = ['Policy End Date', 'Policy Start Date']
             for column in date_columns:
                 if column in processed_df.columns:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    # We do NOT call .strftime() again — parse_date_flexible already returns a string
                     processed_df[column] = processed_df[column].fillna('')
 
             # Create necessary columns
@@ -888,8 +955,8 @@ def process_united_india_insurance(
             processed_df['Narration'] = ''
             processed_df['Policy Type'] = ''
 
-            # IMPORTANT: Keep 'Policy No.' exactly as is. 
-            # Endorsement No. is derived from the last slash part if not '0'
+            # Keep 'Policy No.' exactly as is. 
+            # Endorsement No. derived from the last slash part if not '0'
             if 'Policy No.' in processed_df.columns:
                 def get_endorsement_no(policy_no):
                     if pd.isnull(policy_no):
@@ -905,7 +972,7 @@ def process_united_india_insurance(
             else:
                 processed_df['Endorsement No.'] = ''
 
-            # Clean numeric columns
+            # Clean numeric columns in processed_df
             numeric_columns = ['Premium', 'Brokerage Rate', 'Brokerage']
             for column in numeric_columns:
                 if column in processed_df.columns:
@@ -931,7 +998,7 @@ def process_united_india_insurance(
                 )
                 processed_df['Brokerage Rate'] = processed_df['Brokerage Rate'].round(2)
 
-            # Round numeric columns
+            # Round numeric columns in processed_df
             for column in numeric_columns:
                 if column in processed_df.columns:
                     processed_df[column] = processed_df[column].round(2)
@@ -945,7 +1012,7 @@ def process_united_india_insurance(
 
             # === Begin Additional Processing ===
 
-            # Calculate sum of 'Brokerage' (float)
+            # Sum of 'Brokerage'
             sum_brokerage = processed_df['Brokerage'].astype(float).sum()
 
             # --- Table_4 processing (closest row match) ---
@@ -960,47 +1027,17 @@ def process_united_india_insurance(
             table_4['Brokerage_Diff'] = abs(table_4['Amount_cleaned'] - sum_brokerage)
             amount_matching_row_index = table_4['Brokerage_Diff'].idxmin()
             amount_matching_row = table_4.loc[amount_matching_row_index]
-            narration_value_original = amount_matching_row['Amount']  # Use original amount with commas
-            bank_value = amount_matching_row['Bank']
-            date_col = amount_matching_row['Date']
-            insurer_name = amount_matching_row['Insurer Name']
-            # For narration, we'll fill it from table_4 or table_4 columns
-            invoice_no = amount_matching_row['Invoice No']
-
-            if 'Narration' in amount_matching_row and pd.notnull(amount_matching_row['Narration']):
-                narration_from_table_4 = amount_matching_row['Narration']
-            else:
-                narration_from_table_4 = amount_matching_row.get('Narration (Ref)', '')
-
-            # Set 'NPT2'
-            processed_df['NPT2'] = narration_from_table_4
-
-            # Remove special characters from 'Narration' for file naming
-            safe_narration = ''.join(e for e in str(narration_from_table_4) if e.isalnum() or e == ' ').strip()
-
-            # Get 'Debtor Branch Ref' from cust_neft_data
-            debtor_branch_ref_row = cust_neft_data[cust_neft_data['Name'] == insurer_name]
-            if not debtor_branch_ref_row.empty:
-                debtor_branch_ref = debtor_branch_ref_row['No.2'].iloc[0]
-            else:
-                debtor_branch_ref = ''
-
-            processed_df['Debtor Branch Ref'] = debtor_branch_ref
-            processed_df['Service Tax Ledger'] = processed_df['Debtor Branch Ref'].str.replace('CUST_NEFT_', '')
-
-            # Set 'Debtor Name'
-            processed_df['Debtor Name'] = insurer_name
+            
+            # We used to get narration_value_original from table_4['Amount'],
+            # but now we want the narration value from table_3's 'NET' column.
 
             # --- Table_5 processing (remove empty SupplierState rows, attempt to match sum of brokerage) ---
             table_5_temp = table_5.copy()
-
-            # Remove rows with empty or null SupplierState
             table_5_temp = table_5_temp[
                 table_5_temp['SupplierState'].notnull() &
                 (table_5_temp['SupplierState'].str.strip() != '')
             ].reset_index(drop=True)
 
-            # Make sure parentheses are removed from 'TotalTaxAmt'
             table_5_temp['TotalTaxAmt_cleaned'] = (
                 table_5_temp['TotalTaxAmt']
                 .astype(str)
@@ -1010,22 +1047,15 @@ def process_united_india_insurance(
                 .astype(float)
             )
 
-            # We want to see if there's a set (or the entire table_5_temp) that sums to sum_brokerage
-            # The simplest approach: check if the sum of all rows in table_5_temp matches sum_brokerage
             total_tax_amt_sum = table_5_temp['TotalTaxAmt_cleaned'].sum()
-
             if abs(total_tax_amt_sum - sum_brokerage) < 0.001:
                 # Sums match
-                # Concatenate all 'Invoice No' values
                 invoice_no_list = table_5_temp['Invoice No'].dropna().astype(str).unique()
                 invoice_no_concat = ','.join(invoice_no_list)
 
-                # SupplierState from the first row
                 supplier_state = table_5_temp.iloc[0]['SupplierState']
                 supplier_name_col = table_5_temp.iloc[0]['SupplierName']
-
             else:
-                # If no direct match, fallback to single closest row logic
                 table_5_temp['Brokerage_Diff'] = abs(table_5_temp['TotalTaxAmt_cleaned'] - sum_brokerage)
                 matching_row_index = table_5_temp['Brokerage_Diff'].idxmin()
                 matching_row = table_5_temp.loc[matching_row_index]
@@ -1040,24 +1070,8 @@ def process_united_india_insurance(
             # Overwrite invoice_no with our new/concatenated value
             invoice_no = invoice_no_concat
 
-            # --- Read 'Chart of Account' to get G/L No ---
-            chart_of_account_path = r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller\Common folder AP & AR\Brokerage Statement Automation\support files\Chart of Account.xlsx'
-            if not os.path.exists(chart_of_account_path):
-                raise FileNotFoundError(f"Chart of Account file not found at path: {chart_of_account_path}")
-
-            chart_of_account = pd.read_excel(chart_of_account_path)
-            chart_of_account['SupplierState'] = chart_of_account['SupplierState'].astype(str).str.strip().str.lower()
-            supplier_state_cleaned = str(supplier_state).strip().lower()
-
-            chart_matching_rows = chart_of_account[chart_of_account['SupplierState'] == supplier_state_cleaned]
-            if not chart_matching_rows.empty:
-                name_ay_2025_26 = chart_matching_rows['Name-AY 2025-26'].iloc[0]
-                gl_no = chart_matching_rows['Gl No'].iloc[0]
-            else:
-                name_ay_2025_26 = ''
-                gl_no = ''
-
-            # --- Table_3 processing (GST TDS) ---
+            # --- Table_3 processing (GST TDS + Net) ---
+            # 1) Detect 'TotalTaxAmt' or 'Total'
             if 'TotalTaxAmt' in table_3.columns:
                 total_tax_amt_col = 'TotalTaxAmt'
             elif 'Total' in table_3.columns:
@@ -1065,13 +1079,27 @@ def process_united_india_insurance(
             else:
                 raise ValueError("Neither 'TotalTaxAmt' nor 'Total' column found in table_3")
 
+            # 2) Detect 'GST TDS' or 'GST TDS @2%'
             if 'GST TDS' in table_3.columns:
                 gst_tds_col = 'GST TDS'
             elif 'GST TDS @2%' in table_3.columns:
                 gst_tds_col = 'GST TDS @2%'
             else:
-                raise ValueError("Neither 'GST TDS' nor 'GST TDS @2%' column found in table_3")
+                gst_tds_col = None  # Fallback if not found
 
+            # 3) Detect 'TDS' or 'TDS @10%'
+            if 'TDS' in table_3.columns:
+                tds_col = 'TDS'
+            elif 'TDS @10%' in table_3.columns:
+                tds_col = 'TDS @10%'
+            else:
+                tds_col = None
+
+            # 4) NET column for narration
+            if 'NET' not in table_3.columns:
+                raise ValueError("NET column not found in table_3")
+
+            # Convert relevant columns to numeric (strip parentheses, etc.)
             table_3['TotalTaxAmt_cleaned'] = (
                 table_3[total_tax_amt_col]
                 .astype(str)
@@ -1080,33 +1108,78 @@ def process_united_india_insurance(
                 .str.replace(')', '')
                 .astype(float)
             )
-            table_3['GST TDS_cleaned'] = (
-                table_3[gst_tds_col]
+            if gst_tds_col:
+                table_3['GST TDS_cleaned'] = (
+                    table_3[gst_tds_col]
+                    .astype(str)
+                    .str.replace(',', '')
+                    .str.replace('(', '')
+                    .str.replace(')', '')
+                    .astype(float)
+                )
+            else:
+                # If neither 'GST TDS' nor 'GST TDS @2%' is found, fill with 0.0
+                table_3['GST TDS_cleaned'] = 0.0
+
+            if tds_col:
+                table_3['TDS_cleaned'] = (
+                    table_3[tds_col]
+                    .astype(str)
+                    .str.replace(',', '')
+                    .str.replace('(', '')
+                    .str.replace(')', '')
+                    .astype(float)
+                )
+            else:
+                table_3['TDS_cleaned'] = 0.0
+
+            table_3['NET_cleaned'] = (
+                table_3['NET']
                 .astype(str)
                 .str.replace(',', '')
                 .str.replace('(', '')
                 .str.replace(')', '')
                 .astype(float)
             )
+
+            # Find row in table_3 that best matches sum_brokerage
             table_3['Brokerage_Diff'] = abs(table_3['TotalTaxAmt_cleaned'] - sum_brokerage)
             gst_tds_matching_row_index = table_3['Brokerage_Diff'].idxmin()
             gst_tds_matching_row = table_3.loc[gst_tds_matching_row_index]
-            gst_tds_2_percent = gst_tds_matching_row['GST TDS_cleaned']
+
+            # net_value in 'NET' (for the narration)
+            net_value = gst_tds_matching_row['NET']  # original string with commas removed above if needed
+            # But we keep the "original" style for the final narration as user might want the unmodified string
+            # or re-insert commas. Typically for a direct approach:
+            #   just use the "NET" column from table_3 as it is:
+            narration_value_original = str(gst_tds_matching_row['NET'])  # might have commas removed but let's keep
+
+            # The "third_new_row_brokerage" from TDS or TDS@10%
+            third_new_row_brokerage_val = gst_tds_matching_row['TDS_cleaned']
+
+            # Also handle GST TDS @2% if needed
+            gst_tds_2_percent = gst_tds_matching_row['GST TDS_cleaned']  # might still be used
 
             # Format date from table_4 row
+            date_col = amount_matching_row['Date']
             try:
                 date_col_formatted = pd.to_datetime(date_col).strftime('%d/%m/%Y')
             except Exception:
                 date_col_formatted = ''
 
-            # Check if GST is present in this attached data
-            col_has_gst = any(
+            # --- Check if GST is present in `df` columns OR `table_3` columns OR any row in df ---
+            col_has_gst_df = any(
                 re.search(r'(?i)\bgst\b', str(col)) or re.search(r'(?i)gst\s*@?18%', str(col))
                 for col in df.columns
             )
+            col_has_gst_t3 = any(
+                re.search(r'(?i)\bgst\b', str(col)) or re.search(r'(?i)gst\s*@?18%', str(col))
+                for col in table_3.columns
+            )
             row_has_gst = df.applymap(lambda x: 'gst' in str(x).lower() if isinstance(x, str) else False).any().any()
-            gst_present = col_has_gst or row_has_gst
+            gst_present = col_has_gst_df or col_has_gst_t3 or row_has_gst
 
+            # If GST present, mention "with GST"; else "without GST 18%"
             if gst_present:
                 narration = (
                     f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} "
@@ -1121,6 +1194,7 @@ def process_united_india_insurance(
             processed_df['Narration'] = narration
 
             # Map 'Bank Ledger'
+            bank_value = amount_matching_row['Bank']
             bank_ledger_lookup = {
                 'CITI_005_2600004': 'CITIBANK 340214005 ACCOUNT',
                 'HSBC_001_2600014': 'HSBC A/C-030-618375-001',
@@ -1141,9 +1215,31 @@ def process_united_india_insurance(
             )
 
             # --- Branch lookups for state -> shortform
-            branch_lookups_path = r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller\Common folder AP & AR\Brokerage Statement Automation\support files\state_lookups.xlsx'
+            chart_of_account_path = (
+                r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller\Common folder AP & AR\Brokerage '
+                r'Statement Automation\support files\Chart of Account.xlsx'
+            )
+            if not os.path.exists(chart_of_account_path):
+                raise FileNotFoundError(f"Chart of Account file not found at path: {chart_of_account_path}")
+
+            branch_lookups_path = (
+                r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller\Common folder AP & AR\Brokerage '
+                r'Statement Automation\support files\state_lookups.xlsx'
+            )
             if not os.path.exists(branch_lookups_path):
                 raise FileNotFoundError(f"Branch lookups file not found at path: {branch_lookups_path}")
+
+            chart_of_account = pd.read_excel(chart_of_account_path)
+            chart_of_account['SupplierState'] = chart_of_account['SupplierState'].astype(str).str.strip().str.lower()
+
+            supplier_state_cleaned = str(supplier_state).strip().lower()
+            chart_matching_rows = chart_of_account[chart_of_account['SupplierState'] == supplier_state_cleaned]
+            if not chart_matching_rows.empty:
+                name_ay_2025_26 = chart_matching_rows['Name-AY 2025-26'].iloc[0]
+                gl_no = chart_matching_rows['Gl No'].iloc[0]
+            else:
+                name_ay_2025_26 = ''
+                gl_no = ''
 
             branch_lookups = pd.read_excel(branch_lookups_path)
             branch_lookups['state'] = branch_lookups['state'].astype(str).str.strip().str.lower()
@@ -1161,10 +1257,9 @@ def process_united_india_insurance(
             # 2) TDS row => negative of gst_tds_2_percent
             first_new_row_brokerage = gst_tds_18_percent
             second_new_row_brokerage = -gst_tds_2_percent
-            total_brokerage_with_new_rows = sum_brokerage + first_new_row_brokerage + second_new_row_brokerage
-            # 3) The difference row => to match narration_value_original
-            narration_value_float = float(str(narration_value_original).replace(',', ''))
-            third_new_row_brokerage = narration_value_float - total_brokerage_with_new_rows
+
+            # Instead of difference row, use TDS or TDS@10% from table_3 for third_new_row_brokerage
+            third_new_row_brokerage = third_new_row_brokerage_val
 
             new_rows = pd.DataFrame({
                 'Entry No.': '',
@@ -1232,7 +1327,7 @@ def process_united_india_insurance(
             # Update 'Entry No.'
             processed_df['Entry No.'] = range(1, len(processed_df) + 1)
 
-            # Rearranging columns
+            # Rearrange columns
             desired_columns = [
                 'Entry No.', 'Debtor Name', 'Nature of Transaction', 'AccountType', 'Debtor Branch Ref',
                 'Client Name', 'Policy No.', 'Risk', 'Endorsement No.', 'Policy Type', 'Policy Start Date',
@@ -1256,6 +1351,7 @@ def process_united_india_insurance(
 
             # Generate filenames
             short_subject = subject[:50].strip().replace(' ', '_').replace('.', '').replace(':', '')
+            safe_narration = ''.join(e for e in str(processed_df['NPT2'].iloc[-1]) if e.isalnum() or e == ' ').strip()
             short_narration = safe_narration[:50].strip().replace(' ', '_')
             date_str = datetime.now().strftime("%Y%m%d")
 
@@ -1293,6 +1389,7 @@ def process_united_india_insurance(
     except Exception as e:
         print(f"Error processing United India Insurance data: {str(e)}", file=sys.stderr)
         raise
+
 
 
 def process_tata_aia_insurance(file_path, template_data, risk_code_data, cust_neft_data, table_3, table_4, table_5, subject, mappings):
