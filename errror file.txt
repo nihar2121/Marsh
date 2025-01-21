@@ -1,0 +1,12 @@
+  File "C:\Users\u1222523\OneDrive - MMC\Desktop\STATEMENT\TOOL\PYTHON\CODE FILE\poc_frontend.py", line 1847, in process_data
+    os.replace(email_file_path, processed_email_file_path)
+PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: '\\\\?\\UNC\\Mgd.mrshmc.com\\ap_data\\MBI2\\Shared\\Common - FPA\\Common Controller\\Common folder AP & AR\\Brokerage Statement Automation\\Email Received\\FW_ NEFT Recd From Bajaj Allianz Life Insurance Company Limited on 09_19_2024 for Rs_3_177_732.msg' -> '\\\\?\\UNC\\Mgd.mrshmc.com\\ap_data\\MBI2\\Shared\\Common - FPA\\Common Controller\\Common folder AP & AR\\Brokerage Statement Automation\\processed_files\\FW_ NEFT Recd From Bajaj Allianz Life Insurance Company Limited on 09_19_2024 for Rs_3_177_732.msg'
+127.0.0.1 - - [21/Jan/2025 15:15:56] "GET /process_data?function_name=process_bajaj_allianz_life_insurance&subject=FW:+NEFT+Recd+From+Bajaj+Allianz+Life+Insurance+Company+Limited+on+09/19/2024+for+Rs.3,177,732&mappings={'PRODUCT_NAME':+'Risk',+'POLICY_NO':+'Policy+No.',+'INSURED_PERSON':+'Client+Name',+'PAID_TO_DATE':+'Policy+End+Date',+'PAID_FROM_DATE':+'Policy+Start+Date',+'BRANCH_STATE':+'Branch',+'blank':+'P+%26+L+JV',+'blank1':+'Endorsement+No.',+'PREMIUM':+'Premium1',+'blank2':+'Premium2',+'blank3':+'Premium3',+'COMMISSION':+'Brokerage1',+'blank4':+'Brokerage2',+'blank5':+'Brokerage3',+'MASTER_POLICY_NO':+'ASP+Practice'}&selected_insurer=Bajaj+Allianz+Life+Insurance+Company+Limited&file_name=FW_+NEFT+Recd+From+Bajaj+Allianz+Life+Insurance+Company+Limited+on+09_19_2024+for+Rs_3_177_732.msg HTTP/1.1" 500 -
+has context menu
+
+
+has context menu
+
+
+
+let's 
