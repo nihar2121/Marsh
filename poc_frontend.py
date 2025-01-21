@@ -756,47 +756,48 @@ def preview_email():
     email_folder_path = r'\\?\UNC\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller\Common folder AP & AR\Brokerage Statement Automation\Email Received'
     file_path = os.path.join(email_folder_path, file_name)
 
-
     try:
-        # Open and read the .msg file
+        # 1) Open and read the .msg file
         msg = extract_msg.Message(file_path)
         email_subject = msg.subject  # Extract the subject
 
         global email_body
-        email_body = msg.htmlBody  # Use the raw HTML body if available
+        email_body = msg.htmlBody
 
         if not email_body:
             # Fall back to plain text if HTML body isn't available
-            email_body = msg.body.replace('\n', '<br>')  # Use line breaks for plain text
+            email_body = msg.body.replace('\n', '<br>')
 
-        # Extract attachment if it exists
+        # 2) Extract attachment if it exists
         global file_attachment
-        file_attachment = None  # Reset the file attachment
+        file_attachment = None
         global file_path_n
-        file_path_n = None  # Reset the file attachment
+        file_path_n = None
 
         for attachment in msg.attachments:
-            # Save the attachment file
             attachment_filename = os.path.join(email_folder_path, attachment.longFilename)
             with open(attachment_filename, 'wb') as f:
                 f.write(attachment.data)
-            file_attachment = attachment_filename  # Set the file_attachment to the saved file path
+            file_attachment = attachment_filename
             file_path_n = attachment_filename
 
             # Break after saving the first attachment
             break
 
-        # If no attachment is found, proceed to display the email
+        # 3) If no attachment is found, proceed to display the email
         if file_attachment is None:
             print("No valid attachment found.")
 
-        # Render the email preview with the raw HTML body (no parsing/modification)
+        # 4) IMPORTANT: Close the msg to release the lock on the file.
+        msg.close()
+
+        # 5) Render the email preview
         return render_template_string(
             email_preview_page,
             email_body=email_body,
             file_name=file_name,
             subject=email_subject,
-            already_processed=already_processed  # Pass the flag to the template
+            already_processed=already_processed
         )
 
     except Exception as e:
@@ -1169,7 +1170,8 @@ def select_insurer():
                 'reward': 'Brokerage1',
                 'TP_commission': 'Brokerage2',
                 'Terrorism AMOUNT': 'Brokerage3',
-                'MASTER_POLICY_NO': 'ASP Practice'
+                'MASTER_POLICY_NO': 'ASP Practice',
+                'sjdklf;jadksl;af': 'Income category'
                                                         }
         elif selected_insurer == 'Hdfc Ergo General Insurance Company Limited':
 
