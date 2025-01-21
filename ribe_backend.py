@@ -133,7 +133,8 @@ def process_file(filepath):
             brokerage_keywords = [
                 "BROKERAGE TRNSFR", "BROKERGE TRNSFER", "BROKERAGE TRNSFR",
                 "BROKERAGE TRNSFR", "BROKERGE TRANSFR", "BROKRAGE TRANSFR",
-                "BROKRAGE TRANSFR", "BROKERGE TRNFER", "BROKERAGE TRSF"
+                "BROKRAGE TRANSFR", "BROKERGE TRNFER", "BROKERAGE TRSF", "BROKRGE TRNFER",
+                "BROKRGE TRANSFR", "BROKRGE TRNFER", "BROKRGE TRNFER", "BROKRGE TRNFER"
             ]
             if customer_ref in brokerage_keywords:
                 return "Brokerage Transfer"

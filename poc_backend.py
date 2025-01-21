@@ -955,6 +955,38 @@ def process_united_india_insurance(
             processed_df['Narration'] = ''
             processed_df['Policy Type'] = ''
 
+            insurer_name = 'United India Insurance Co Ltd.'
+            debtor_branch_ref_row = cust_neft_data[cust_neft_data['Name'] == insurer_name]
+            if not debtor_branch_ref_row.empty:
+                debtor_branch_ref = debtor_branch_ref_row['No.2'].iloc[0]
+            else:
+                debtor_branch_ref = ''
+
+            # Set 'Debtor Branch Ref' in processed_df
+            processed_df['Debtor Branch Ref'] = debtor_branch_ref
+
+            # 'Service Tax Ledger' is derived from 'Debtor Branch Ref'
+            processed_df['Service Tax Ledger'] = processed_df['Debtor Branch Ref'].str.replace('CUST_NEFT_', '')
+
+            # Set 'Debtor Name' as 'Insurer Name'
+            processed_df['Debtor Name'] = insurer_name
+
+            debtor_branch_ref_row = cust_neft_data[cust_neft_data['Name'] == insurer_name]
+            if not debtor_branch_ref_row.empty:
+                debtor_branch_ref = debtor_branch_ref_row['No.2'].iloc[0]
+            else:
+                debtor_branch_ref = ''
+
+            # Set 'Debtor Branch Ref' in processed_df
+            processed_df['Debtor Branch Ref'] = debtor_branch_ref
+
+            # 'Service Tax Ledger' is derived from 'Debtor Branch Ref'
+            processed_df['Service Tax Ledger'] = processed_df['Debtor Branch Ref'].str.replace('CUST_NEFT_', '')
+
+            # Set 'Debtor Name' as 'Insurer Name'
+            processed_df['Debtor Name'] = insurer_name
+
+
             # Keep 'Policy No.' exactly as is. 
             # Endorsement No. derived from the last slash part if not '0'
             if 'Policy No.' in processed_df.columns:
@@ -1259,7 +1291,7 @@ def process_united_india_insurance(
             second_new_row_brokerage = -gst_tds_2_percent
 
             # Instead of difference row, use TDS or TDS@10% from table_3 for third_new_row_brokerage
-            third_new_row_brokerage = third_new_row_brokerage_val
+            third_new_row_brokerage = -abs(third_new_row_brokerage_val)
 
             new_rows = pd.DataFrame({
                 'Entry No.': '',
