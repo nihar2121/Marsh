@@ -955,7 +955,7 @@ def process_united_india_insurance(
             processed_df['Narration'] = ''
             processed_df['Policy Type'] = ''
 
-            insurer_name = 'United India Insurance Co Ltd.'
+            insurer_name = 'United India Insurance Co. Ltd.'
             debtor_branch_ref_row = cust_neft_data[cust_neft_data['Name'] == insurer_name]
             if not debtor_branch_ref_row.empty:
                 debtor_branch_ref = debtor_branch_ref_row['No.2'].iloc[0]
@@ -1122,8 +1122,10 @@ def process_united_india_insurance(
             # 3) Detect 'TDS' or 'TDS @10%'
             if 'TDS' in table_3.columns:
                 tds_col = 'TDS'
-            elif 'TDS @10%' in table_3.columns:
-                tds_col = 'TDS @10%'
+            elif 'TDS@10%' in table_3.columns:
+                tds_col = 'TDS@10%'
+            elif 'TDS@10%' in table_3.columns:
+                tds_col = 'TDS@10%'
             else:
                 tds_col = None
 
@@ -1215,7 +1217,7 @@ def process_united_india_insurance(
             if gst_present:
                 narration = (
                     f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} "
-                    f"from {supplier_name_col} with GST"
+                    f"from {supplier_name_col} with GST 18%"
                 )
             else:
                 narration = (
