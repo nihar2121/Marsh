@@ -405,7 +405,7 @@ def process_oriental_insurance_co(file_path, template_data, risk_code_data, cust
             for column in date_columns:
                 if column in processed_df.columns:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if not pd.isnull(x) and x != '' else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if not pd.isnull(x) else '')
                     processed_df[column] = processed_df[column].fillna('')
 
             # Create necessary columns
@@ -763,66 +763,74 @@ import numpy as np
 from datetime import datetime, timedelta
 from dateutil import parser
 
+import pandas as pd
+from datetime import datetime, timedelta
+
 def parse_date_flexible(date_str):
     """
     A flexible date parser that handles:
     - Excel numeric dates (NO day subtraction).
     - 'YYYYMMDD' numeric format.
-    - Common string formats: '%d-%b-%y', '%d/%m/%Y', '%Y-%m-%d', etc.
-
-    Returns a string in 'dd/mm/yyyy' if successfully parsed, else ''.
+    - Common string formats: '%d-%b-%y', '%d-%b-%Y', '%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%d/%m/%y', '%Y%m%d'.
+    
+    Returns a datetime if successfully parsed, else pd.NaT.
     NOTE: We do NOT shift by -1 day anywhere.
     """
+    # 1) Check for null-like input
     if pd.isnull(date_str) or date_str == '':
-        return ''  # Return empty for null or empty strings
+        return pd.NaT
 
-    # 1) If it's already a datetime, just format it
+    # 2) Already a datetime
     if isinstance(date_str, datetime):
-        return date_str.strftime('%d/%m/%Y')
+        return date_str
 
-    # 2) If it's numeric (Excel date or YYYYMMDD)
+    # 3) Numeric input (could be Excel date or YYYYMMDD)
     if isinstance(date_str, (float, int)):
         date_int = int(date_str)
         # Check typical Excel date range
         if 59 < date_int < 2958465:
-            # Excel numeric date (no day subtracted)
+            # Excel numeric date (no day subtraction)
             date_obj = datetime(1899, 12, 30) + timedelta(days=date_int)
-            return date_obj.strftime('%d/%m/%Y')
-        # Check for YYYYMMDD range
+            return date_obj
+
+        # Check if it's within the range of 'YYYYMMDD'
         if 19000101 <= date_int <= 29991231:
             try:
                 date_obj = datetime.strptime(str(date_int), '%Y%m%d')
-                return date_obj.strftime('%d/%m/%Y')
+                return date_obj
             except ValueError:
-                return ''
-        return ''  # If numeric but not in a valid range
+                return pd.NaT
 
-    # 3) If it's a string
+        # If numeric but doesn't match any known date pattern
+        return pd.NaT
+
+    # 4) String input
     if isinstance(date_str, str):
-        # Remove all non-digits if we suspect 'YYYYMMDD'
+        # Attempt known formats on a digit-only version, in case it's something like '20230101'
         date_str_cleaned = ''.join(filter(str.isdigit, date_str))
-        date_formats = [
+        known_formats = [
             '%d-%b-%y', '%d-%b-%Y', '%d/%m/%Y', '%Y-%m-%d',
             '%d-%m-%Y', '%d/%m/%y', '%Y%m%d'
         ]
 
-        # Try known formats first on the cleaned string
-        for fmt in date_formats:
+        # Try known formats on the cleaned string
+        for fmt in known_formats:
             try:
                 parsed_obj = datetime.strptime(date_str_cleaned, fmt)
-                return parsed_obj.strftime('%d/%m/%Y')
+                return parsed_obj
             except ValueError:
                 pass
 
-        # Fallback: try pandas to_datetime on the original string
+        # Fallback: try pandas to_datetime with dayfirst=True on the original string
         try:
             parsed_obj = pd.to_datetime(date_str, dayfirst=True)
-            return parsed_obj.strftime('%d/%m/%Y')
+            return parsed_obj
         except ValueError:
-            return ''
+            return pd.NaT
 
-    # If none of the above matched, return empty
-    return ''
+    # If we can't handle it, return NaT
+    return pd.NaT
+
 
 
 def process_united_india_insurance(
@@ -2456,7 +2464,7 @@ def process_star_health_insurer(file_path, template_data, risk_code_data, cust_n
         for column in date_columns:
             if column in processed_df.columns:
                 processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if not pd.isnull(x) and x != '' else '')
+                processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if not pd.isnull(x) else '')
                 processed_df[column] = processed_df[column].fillna('')
 
         # Create necessary columns similar to United India Insurance processing
@@ -22715,7 +22723,7 @@ def process_national_insurance_limited(
                 if column in processed_df.columns:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
                     processed_df[column] = processed_df[column].apply(
-                        lambda x: x.strftime('%d/%m/%Y') if not pd.isnull(x) and x != '' else ''
+                        lambda x: x.strftime('%d/%m/%Y') if not pd.isnull(x) else ''
                     )
                     processed_df[column] = processed_df[column].fillna('')
             print("Date columns formatted.")
@@ -23303,7 +23311,7 @@ def process_aviva_insurance_co(
                 if column in processed_df.columns:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
                     processed_df[column] = processed_df[column].apply(
-                        lambda x: x.strftime('%d/%m/%Y') if not pd.isnull(x) and x != '' else ''
+                        lambda x: x.strftime('%d/%m/%Y') if not pd.isnull(x) else ''
                     )
                     processed_df[column] = processed_df[column].fillna('')
             print("Date columns formatted.")
