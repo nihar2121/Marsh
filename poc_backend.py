@@ -22795,6 +22795,7 @@ def process_national_insurance_limited(
                     processed_df[column] = processed_df[column].round(2).astype(str).str.replace(r'\.0+$', '', regex=True).str.zfill(1)
                     # To ensure '0' is '0.00'
                     processed_df[column] = processed_df[column].apply(lambda x: "{0:.2f}".format(float(x)) if x else "0.00")
+            processed_df['TDS Ledger'] = ''
 
             # Handle 'Branch' mapping
             if 'Branch' in processed_df.columns:
@@ -23008,7 +23009,7 @@ def process_national_insurance_limited(
             # Calculate 'gst_tds_18_percent' and 'third_new_row_brokerage'
             gst_tds_18_percent = sum_brokerage * 0.18
             total_brokerage_with_new_rows = sum_brokerage + gst_tds_18_percent - total_gst_tds
-            third_new_row_brokerage = narration_value_float - total_brokerage_with_new_rows
+            third_new_row_brokerage = -abs(sum_brokerage * .10)
             print(f"Calculated gst_tds_18_percent: {gst_tds_18_percent}")
             print(f"Calculated third_new_row_brokerage: {third_new_row_brokerage}")
 
