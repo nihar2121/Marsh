@@ -5004,11 +5004,8 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
         for column in date_columns:
             if column in processed_df.columns and not processed_df[column].empty:
                 processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                processed_df[column] = processed_df[column].apply(
-                    lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else ''
-                )
-                processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls
-                print(f"Processed date column '{column}'.")
+                processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) and not pd.isnull(x) else '')
+
             else:
                 print(f"Column '{column}' not found or empty in processed_df.")
 
