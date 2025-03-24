@@ -771,7 +771,7 @@ def parse_date_flexible(date_str):
     A flexible date parser that handles:
     - Excel numeric dates (NO day subtraction).
     - 'YYYYMMDD' numeric format.
-    - Common string formats: '%d-%b-%y', '%d-%b-%Y', '%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%d/%m/%y', '%Y%m%d'.
+    - Common string formats including those with month names and slashes.
     
     Returns a datetime if successfully parsed, else pd.NaT.
     NOTE: We do NOT shift by -1 day anywhere.
@@ -787,48 +787,51 @@ def parse_date_flexible(date_str):
     # 3) Numeric input (could be Excel date or YYYYMMDD)
     if isinstance(date_str, (float, int)):
         date_int = int(date_str)
-        # Check typical Excel date range
         if 59 < date_int < 2958465:
             # Excel numeric date (no day subtraction)
-            date_obj = datetime(1899, 12, 30) + timedelta(days=date_int)
-            return date_obj
-
-        # Check if it's within the range of 'YYYYMMDD'
+            return datetime(1899, 12, 30) + timedelta(days=date_int)
         if 19000101 <= date_int <= 29991231:
             try:
-                date_obj = datetime.strptime(str(date_int), '%Y%m%d')
-                return date_obj
+                return datetime.strptime(str(date_int), '%Y%m%d')
             except ValueError:
                 return None
-
-        # If numeric but doesn't match any known date pattern
         return None
 
     # 4) String input
     if isinstance(date_str, str):
-        # Attempt known formats on a digit-only version, in case it's something like '20230101'
-        date_str_cleaned = ''.join(filter(str.isdigit, date_str))
+        # If the string contains no alphabetic characters, we may safely clean it.
+        if not any(c.isalpha() for c in date_str):
+            date_str_cleaned = ''.join(filter(str.isdigit, date_str))
+            # Try known numeric formats if the length seems appropriate
+            for fmt in ['%Y%m%d', '%d%m%Y']:
+                try:
+                    return datetime.strptime(date_str_cleaned, fmt)
+                except ValueError:
+                    pass
+
+        # List of known formats using the original string
         known_formats = [
             '%d-%b-%y', '%d-%b-%Y', '%d/%m/%Y', '%Y-%m-%d',
             '%d-%m-%Y', '%d/%m/%y', '%Y%m%d'
         ]
-
-        # Try known formats on the cleaned string
         for fmt in known_formats:
             try:
-                parsed_obj = datetime.strptime(date_str_cleaned, fmt)
-                return parsed_obj
+                return datetime.strptime(date_str, fmt)
             except ValueError:
                 pass
 
-        # Fallback: try pandas to_datetime with dayfirst=True on the original string
+        # Fallback: try pandas to_datetime with dayfirst True, then False
         try:
             parsed_obj = pd.to_datetime(date_str, dayfirst=True)
             return parsed_obj
         except ValueError:
-            return None
+            try:
+                parsed_obj = pd.to_datetime(date_str, dayfirst=False)
+                return parsed_obj
+            except Exception:
+                return None
 
-    # If we can't handle it, return NaT
+    # If we can't handle it, return pd.NaT
     return None
 
 
@@ -2120,7 +2123,7 @@ def process_icici_lombard_insurance(file_path, template_data, risk_code_data, cu
         for column in date_columns:
             if column in processed_df.columns and not processed_df[column].empty:
                 processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                 processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
         if 'Policy No.' in processed_df.columns:
@@ -2765,7 +2768,7 @@ def process_hdfc_life_insurance_co(file_path, template_data, risk_code_data, cus
         for column in date_columns:
             if column in processed_df.columns and not processed_df[column].empty:
                 processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                 processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
         if 'Policy No.' in processed_df.columns:
@@ -3199,7 +3202,7 @@ def process_shriram_general_insurance(file_path, template_data, risk_code_data, 
         for column in date_columns:
             if column in processed_df.columns and not processed_df[column].empty:
                 processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                 processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
         if not processed_df['Endorsement No.'].isnull().all():
@@ -3636,7 +3639,7 @@ def process_kotak_mahindra_insurance(file_path, template_data, risk_code_data, c
         for column in date_columns:
             if column in processed_df.columns and not processed_df[column].empty:
                 processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                 processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
         # For 'P & L JV' column, handle 'CANCELLATION' and 'ENDORSEMENTPOLICY'
@@ -4031,7 +4034,7 @@ def process_universal_sampo_insurance(file_path, template_data, risk_code_data, 
         for column in date_columns:
             if column in processed_df.columns and not processed_df[column].empty:
                 processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                 processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
         # Extract Endorsement No. from Policy No.
@@ -5449,7 +5452,7 @@ def process_cholamandalam_general_insurance(file_path, template_data, risk_code_
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
             # In the 'Risk' column, remove all numbers
             if 'Risk' in processed_df.columns:
@@ -5830,7 +5833,7 @@ def process_liberty_general_insurance(file_path, template_data, risk_code_data, 
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
             # In the 'Risk' column, remove all numbers
@@ -6294,7 +6297,7 @@ def proess_acko_general_insurance(file_path, template_data, risk_code_data, cust
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
             # In the 'Risk' column, remove all numbers
@@ -6766,7 +6769,7 @@ def process_sbi_general_insurance(file_path, template_data, risk_code_data, cust
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
             # In the 'Risk' column, remove all numbers
@@ -7239,7 +7242,7 @@ def process_godigit_general_insurance(file_path, template_data, risk_code_data, 
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
             # In the 'Risk' column, remove all numbers
@@ -7780,7 +7783,7 @@ def process_raheja_general_insurance(file_path, template_data, risk_code_data, c
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
             # In the 'Risk' column, remove all numbers
@@ -8245,7 +8248,7 @@ def process_royal_sundaram_general_insurance(file_path, template_data, risk_code
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
             # Calculate 'Brokerage Rate' as (Brokerage / Premium) * 100, rounded to 2 decimals
@@ -9479,7 +9482,7 @@ def process_bajaj_allianz_insurance(file_path, template_data, risk_code_data, cu
                 if column in processed_df.columns:
                     print(f"Processing date column: {column}")
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
                     print(f"Formatted dates in column: {column}")
                 else:
@@ -10041,7 +10044,7 @@ def process_hdfc_ergo_insurance(file_path, template_data, risk_code_data, cust_n
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
             # Calculate 'Brokerage Rate' as (Brokerage / Premium) * 100, rounded to 2 decimals
@@ -10648,7 +10651,7 @@ def process_relaince_general_insurance_co(file_path, template_data, risk_code_da
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
             # Calculate 'Brokerage Rate' as (Brokerage / Premium) * 100, rounded to 2 decimals
@@ -11903,7 +11906,7 @@ def process_care_health_insurance_limited(file_path, template_data, risk_code_da
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
             # Calculate 'Brokerage Rate' as (Brokerage / Premium) * 100, rounded to 2 decimals
@@ -12417,7 +12420,7 @@ def process_magma_hdi_general_insurance_company(file_path, template_data, risk_c
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
                     print(f"Processed date column '{column}'")
                 else:
@@ -13048,7 +13051,7 @@ def process_generali_india_insurance_company(file_path, template_data, risk_code
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
                     print(f"Processed date column '{column}'")
                 else:
@@ -13614,7 +13617,7 @@ def process_manipal_health_insurance_company(file_path, template_data, risk_code
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
                     print(f"Processed date column '{column}'")
                 else:
@@ -14176,7 +14179,7 @@ def process_aditya_insurance_co(file_path, template_data, risk_code_data, cust_n
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
                     print(f"Processed date column '{column}'")
                 else:
@@ -16025,7 +16028,7 @@ def process_iffco_tokyo_insurer(file_path, template_data, risk_code_data, cust_n
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
                     print(f"Processed date column '{column}'")
                 else:
@@ -16579,7 +16582,7 @@ def process_max_life_insurance(file_path, template_data, risk_code_data, cust_ne
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
                     print(f"Processed date column '{column}'")
                 else:
@@ -17157,7 +17160,7 @@ def process_aditya_birla_sun_life(file_path, template_data, risk_code_data, cust
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
                     print(f"Processed date column '{column}'")
                 else:
@@ -18375,7 +18378,7 @@ def process_pramerica_life_insurance(file_path, template_data, risk_code_data, c
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
                     print(f"Processed date column '{column}'")
                 else:
@@ -18947,7 +18950,7 @@ def process_pnb_metlife_insurance(file_path, template_data, risk_code_data, cust
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
                     print(f"Processed date column '{column}'")
                 else:
@@ -19448,7 +19451,7 @@ def process_go_digit_life_insurance(file_path, template_data, risk_code_data, cu
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
             # Since Risk lookup is not required, we keep 'Risk' as per the mapping
@@ -19905,7 +19908,7 @@ def process_niva_bupa_health_insurance(file_path, template_data, risk_code_data,
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
             # Since Risk lookup is not required, we keep 'Risk' as per the mapping
@@ -20356,7 +20359,7 @@ def process_edelweiss_tokio_life_insurance(file_path, template_data, risk_code_d
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
             # Since Risk lookup is not required, we keep 'Risk' as per the mapping
@@ -20816,7 +20819,7 @@ def process_shriram_life_insurance_co(file_path, template_data, risk_code_data, 
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
             # Since Risk lookup is not required, we keep 'Risk' as per the mapping
@@ -21291,7 +21294,7 @@ def proces_aegon_life_insurance_co(file_path, template_data, risk_code_data, cus
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
             # Since Risk lookup is not required, we keep 'Risk' as per the mapping
@@ -21768,7 +21771,7 @@ def process_indialife_first_insurance(file_path, template_data, risk_code_data, 
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
             # Since Risk lookup is not required, we keep 'Risk' as per the mapping
@@ -22242,7 +22245,7 @@ def kotak_life_insurance_co(file_path, template_data, risk_code_data, cust_neft_
             for column in date_columns:
                 if column in processed_df.columns and not processed_df[column].empty:
                     processed_df[column] = processed_df[column].apply(parse_date_flexible)
-                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) else '')
+                    processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) and hasattr(x, 'strftime') else x)
                     processed_df[column] = processed_df[column].fillna('')  # Ensure no nulls remain
 
             # Since Risk lookup is not required, we keep 'Risk' as per the mapping
