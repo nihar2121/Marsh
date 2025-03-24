@@ -8161,7 +8161,6 @@ def process_raheja_general_insurance(file_path, template_data, risk_code_data, c
 
 
 
-
 def process_royal_sundaram_general_insurance(file_path, template_data, risk_code_data, cust_neft_data,
                                              table_3, table_4, table_5, subject, mappings):
     try:
@@ -8261,7 +8260,7 @@ def process_royal_sundaram_general_insurance(file_path, template_data, risk_code
                 if column in processed_df.columns:
                     processed_df[column] = processed_df[column].apply(lambda x: f"{x:.2f}")
 
-            # For 'Branch' column, map using 'state_lookups.xlsx' 'Sheet2'
+            # For 'P & L JV' column, map using 'state_lookups.xlsx' 'Sheet3'
             if 'P & L JV' in processed_df.columns:
                 endorsement_type_mapping = pd.read_excel(
                     r'\\Mgd.mrshmc.com\ap_data\MBI2\Shared\Common - FPA\Common Controller'
@@ -8301,20 +8300,17 @@ def process_royal_sundaram_general_insurance(file_path, template_data, risk_code
             if 'Endorsement No.' in processed_df.columns:
                 def process_endorsement(row):
                     endorsement_no = str(row['Endorsement No.']).strip()
-                    p_l_jv = str(row.get('P & L JV', '')).strip()
                     if endorsement_no == '0':
                         row['Endorsement No.'] = ''
-                    elif endorsement_no == '1':
-                        row['Endorsement No.'] = '1'
                         row['P & L JV'] = ''
                     else:
-                        if row['Endorsement No.'] != '':
-                            row['P & L JV'] = 'Endorsement'
+                        # Remove leading zeros and check if it equals '1'
+                        if endorsement_no.lstrip('0') == '1':
+                            row['Endorsement No.'] = '1'
+                            row['P & L JV'] = ''
                     return row
 
                 processed_df = processed_df.apply(process_endorsement, axis=1)
-            else:
-                pass
 
             if 'Branch' in processed_df.columns:
                 state_lookups_sheet2 = pd.read_excel(
@@ -8437,9 +8433,11 @@ def process_royal_sundaram_general_insurance(file_path, template_data, risk_code
             processed_df['Debtor Branch Ref'] = debtor_branch_ref
             processed_df['Service Tax Ledger'] = processed_df['Debtor Branch Ref'].str.replace('CUST_NEFT_', '')
             processed_df['Debtor Name'] = insurer_name
+            print("Updated 'Debtor Branch Ref', 'Service Tax Ledger', 'Debtor Name' in processed data.")
 
             # Convert date to dd/mm/yyyy format
             date_col_formatted = pd.to_datetime(date_col).strftime('%d/%m/%Y')
+            print(f"Formatted date: {date_col_formatted}")
 
             # Get 'supplier_name_col' from 'table_4'
             supplier_name_col = ''
@@ -8447,6 +8445,7 @@ def process_royal_sundaram_general_insurance(file_path, template_data, risk_code
                 if col in table_4.columns and not table_4[col].empty:
                     supplier_name_col = table_4[col].iloc[0]
                     break
+            print(f"Supplier name from 'table_4': {supplier_name_col}")
 
             # Create narration considering GST and value in brackets
             if gst_present:
@@ -8459,6 +8458,8 @@ def process_royal_sundaram_general_insurance(file_path, template_data, risk_code
                     narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} ({net_amount_value_formatted}) from {supplier_name_col} without GST 18%"
                 else:
                     narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} without GST 18%"
+            processed_df['Narration'] = narration
+            print(f"Narration set in processed data: {narration}")
             processed_df['Narration'] = narration
 
             # Map 'Bank Ledger' similar to others
@@ -8473,6 +8474,7 @@ def process_royal_sundaram_general_insurance(file_path, template_data, risk_code
                     bank_ledger_value = value
                     break
             processed_df['Bank Ledger'] = bank_ledger_value
+            print(f"'Bank Ledger' set to: {bank_ledger_value}")
 
             # Calculate Brokerage values for the new rows
             tds_column = None
@@ -8525,6 +8527,7 @@ def process_royal_sundaram_general_insurance(file_path, template_data, risk_code
                     'P & L JV': [invoice_nos, invoice_nos],
                     'NPT2': processed_df['NPT2'].iloc[-1]
                 })
+                print("Created new rows for GST present case.")
             else:
                 # Create additional row
                 new_rows = pd.DataFrame({
@@ -8556,6 +8559,8 @@ def process_royal_sundaram_general_insurance(file_path, template_data, risk_code
                     'P & L JV': [invoice_nos],
                     'NPT2': processed_df['NPT2'].iloc[-1]
                 })
+                print("Created new row for GST not present case.")
+            print("Created additional rows.")
 
             # Ensure numeric columns are formatted properly without altering values
             for column in numeric_columns + ['Brokerage Rate']:
@@ -8635,6 +8640,7 @@ def process_royal_sundaram_general_insurance(file_path, template_data, risk_code
     except Exception as e:
         print(f"Error processing Royal Sundaram general insurance: {str(e)}")
         raise
+
 def process_tata_aig_insurance(file_path, template_data, risk_code_data, cust_neft_data,
                                table_3, table_4, table_5, subject, mappings):
     try:
