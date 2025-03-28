@@ -4972,9 +4972,7 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
             processed_df['Branch'] = (
                 processed_df['Branch'].astype(str).str.strip().str.lower()
             )
-            branch_lookup = state_lookups_sheet2.set_index('state')[
-                'shortform'
-            ].to_dict()
+            branch_lookup = state_lookups_sheet2.set_index('state')['shortform'].to_dict()
             processed_df['Branch'] = processed_df['Branch'].map(branch_lookup).fillna('')
             print("Mapped 'Branch' to shortform using state_lookups.")
         else:
@@ -4999,20 +4997,20 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
                 processed_df[column] = 0.00
                 print(f"Column '{column}' not found in processed_df. Filled with 0.00.")
 
-        # Handle dates in 'Policy Start Date' and 'Policy End Date' columns after mappings
+        # Handle dates in 'Policy Start Date' columns after mappings
         date_columns = ['Policy Start Date']
         for column in date_columns:
             if column in processed_df.columns and not processed_df[column].empty:
                 processed_df[column] = processed_df[column].apply(parse_date_flexible)
                 processed_df[column] = processed_df[column].apply(lambda x: x.strftime('%d/%m/%Y') if isinstance(x, datetime) and not pd.isnull(x) else '')
-
             else:
                 print(f"Column '{column}' not found or empty in processed_df.")
 
         # Since no lookups are needed for 'Income category' and 'P & L JV', we skip those steps
         print("Skipped lookups for 'Income category' and 'P & L JV'.")
 
-        # Remove the initial setting of 'NPT2'        # Create necessary columns, excluding 'NPT2' for now
+        # Remove the initial setting of 'NPT2'
+        # Create necessary columns, excluding 'NPT2' for now
         processed_df['Entry No.'] = range(1, len(processed_df) + 1)
         processed_df['Debtor Name'] = (
             processed_df['Debtor Name']
@@ -5131,6 +5129,7 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
             safe_narration = ''.join(e for e in narration_from_table_4 if e.isalnum() or e == ' ').strip()
             print(f"Safe narration for file naming: {safe_narration}")
 
+            # --- UPDATED SECTION START ---
             # Get 'Debtor Branch Ref' from 'cust_neft_data' using 'Insurer Name'
             debtor_branch_ref_row = cust_neft_data[cust_neft_data['Name'].str.lower() == insurer_name.lower()]
             if not debtor_branch_ref_row.empty:
@@ -5139,10 +5138,14 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
             else:
                 debtor_branch_ref = ''
                 print(f"No 'Debtor Branch Ref' found for insurer '{insurer_name}', setting to empty.")
-            processed_df['Debtor Branch Ref'] = debtor_branch_ref
-            processed_df['Service Tax Ledger'] = processed_df['Debtor Branch Ref'].str.replace('CUST_NEFT_', '')
-            processed_df['Debtor Name'] = insurer_name
-            print("Updated 'Debtor Branch Ref', 'Service Tax Ledger', 'Debtor Name' in processed data.")
+
+            # Now update the entire section dataframe so that these values are applied for all rows
+            df_section['Debtor Branch Ref'] = debtor_branch_ref
+            df_section['Service Tax Ledger'] = df_section['Debtor Branch Ref'].str.replace('CUST_NEFT_', '')
+            df_section['Debtor Name'] = insurer_name
+            # Also update Narration and Bank Ledger for all rows in the section
+            # (These values are recalculated below so that all rows have the same consistent values)
+            # --- UPDATED SECTION END ---
 
             # Convert date to dd/mm/yyyy format
             date_col_formatted = pd.to_datetime(date_col).strftime('%d/%m/%Y')
@@ -5167,9 +5170,10 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
                     narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} ({net_amount_value_formatted}) from {supplier_name_col} without GST 18%"
                 else:
                     narration = f"BNG NEFT DT-{date_col_formatted} rcvd towrds brkg Rs.{narration_value_original} from {supplier_name_col} without GST 18%"
-            processed_df['Narration'] = narration
-            print(f"Narration set in processed data: {narration}")
-            processed_df['Narration'] = narration
+            print(f"Narration set: {narration}")
+
+            # Update the entire section dataframe with Narration and Bank Ledger values
+            df_section['Narration'] = narration
 
             # Map 'Bank Ledger' similar to others
             bank_ledger_lookup = {
@@ -5182,7 +5186,7 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
                 if bank_value == key:
                     bank_ledger_value = value
                     break
-            processed_df['Bank Ledger'] = bank_ledger_value
+            df_section['Bank Ledger'] = bank_ledger_value
             print(f"'Bank Ledger' set to: {bank_ledger_value}")
 
             # Calculate Brokerage values for the new rows
@@ -5213,10 +5217,10 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
                 # Create additional rows
                 new_rows = pd.DataFrame({
                     'Entry No.': '',
-                    'Debtor Name': processed_df['Debtor Name'].iloc[0],
+                    'Debtor Name': [df_section['Debtor Name'].iloc[0]] * 2,
                     'Nature of Transaction': ["GST Receipts", "Brokerage Statement"],
-                    'AccountType': processed_df['AccountType'].iloc[0],
-                    'Debtor Branch Ref': processed_df['Debtor Branch Ref'].iloc[0],
+                    'AccountType': [df_section['AccountType'].iloc[0]] * 2,
+                    'Debtor Branch Ref': [df_section['Debtor Branch Ref'].iloc[0]] * 2,
                     'Client Name': ["GST @ 18%", "TDS Receivable - AY 2025-26"],
                     'Policy No.': '',
                     'Risk': '',
@@ -5230,28 +5234,25 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
                     'Narration': narration,
                     'NPT': '',
                     'Bank Ledger': bank_ledger_value,
-                    'AccountTypeDuplicate': [processed_df['AccountTypeDuplicate'].iloc[0], 'G/L Account'],
-                    'Service Tax Ledger': [
-                        processed_df['Service Tax Ledger'].iloc[0],
-                        '2300022'
-                    ],
-                    'TDS Ledger': [processed_df['TDS Ledger'].iloc[0], 'TDS Receivable - AY 2025-26'],
-                    'RepDate': processed_df['RepDate'].iloc[-1],
+                    'AccountTypeDuplicate': [df_section['AccountTypeDuplicate'].iloc[0], 'G/L Account'],
+                    'Service Tax Ledger': [df_section['Service Tax Ledger'].iloc[0], '2300022'],
+                    'TDS Ledger': [df_section['TDS Ledger'].iloc[0], 'TDS Receivable - AY 2025-26'],
+                    'RepDate': df_section['RepDate'].iloc[-1],
                     'Branch': '',
                     'Income category': ['', ''],
-                    'ASP Practice': processed_df['ASP Practice'].iloc[-1],
+                    'ASP Practice': df_section['ASP Practice'].iloc[-1],
                     'P & L JV': [invoice_nos, invoice_nos],
-                    'NPT2': processed_df['NPT2'].iloc[-1]
+                    'NPT2': df_section['NPT2'].iloc[-1]
                 })
                 print("Created new rows for GST present case.")
             else:
                 # Create additional row
                 new_rows = pd.DataFrame({
                     'Entry No.': '',
-                    'Debtor Name': processed_df['Debtor Name'].iloc[0],
+                    'Debtor Name': [df_section['Debtor Name'].iloc[0]],
                     'Nature of Transaction': ["Brokerage Statement"],
-                    'AccountType': processed_df['AccountType'].iloc[0],
-                    'Debtor Branch Ref': processed_df['Debtor Branch Ref'].iloc[0],
+                    'AccountType': [df_section['AccountType'].iloc[0]],
+                    'Debtor Branch Ref': [df_section['Debtor Branch Ref'].iloc[0]],
                     'Client Name': ["TDS Receivable - AY 2025-26"],
                     'Policy No.': '',
                     'Risk': '',
@@ -5268,17 +5269,17 @@ def process_icici_prudential_life_insurance(file_path, template_data, risk_code_
                     'AccountTypeDuplicate': ['G/L Account'],
                     'Service Tax Ledger': ['2300022'],
                     'TDS Ledger': ['TDS Receivable - AY 2025-26'],
-                    'RepDate': processed_df['RepDate'].iloc[-1],
+                    'RepDate': df_section['RepDate'].iloc[-1],
                     'Branch': '',
                     'Income category': [''],
-                    'ASP Practice': [processed_df['ASP Practice'].iloc[-1]],
+                    'ASP Practice': [df_section['ASP Practice'].iloc[-1]],
                     'P & L JV': [invoice_nos],
-                    'NPT2': processed_df['NPT2'].iloc[-1]
+                    'NPT2': df_section['NPT2'].iloc[-1]
                 })
                 print("Created new row for GST not present case.")
             print("Created additional rows.")
 
-            # Ensure numeric columns are formatted properly
+            # Ensure numeric columns are formatted properly in new_rows
             for column in numeric_columns + ['Brokerage Rate']:
                 if column in new_rows.columns:
                     new_rows[column] = pd.to_numeric(
