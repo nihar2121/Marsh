@@ -7764,7 +7764,7 @@ def process_raheja_general_insurance(file_path, template_data, risk_code_data, c
             # Remove rows where both 'Premium' and 'Brokerage' are 0
             if 'Premium' in processed_df.columns and 'Brokerage' in processed_df.columns:
                 processed_df[['Premium', 'Brokerage']] = processed_df[['Premium', 'Brokerage']].apply(pd.to_numeric, errors='coerce').fillna(0)
-                processed_df = processed_df[~((processed_df['Premium'] == 0) & (processed_df['Brokerage'] == 0))]
+                
             else:
                 pass
 
@@ -12463,7 +12463,7 @@ def process_magma_hdi_general_insurance_company(file_path, template_data, risk_c
             # Remove rows where both 'Premium' and 'Brokerage' are 0
             if 'Premium' in processed_df.columns and 'Brokerage' in processed_df.columns:
                 processed_df[['Premium', 'Brokerage']] = processed_df[['Premium', 'Brokerage']].apply(pd.to_numeric, errors='coerce').fillna(0)
-                processed_df = processed_df[~((processed_df['Premium'] == 0) & (processed_df['Brokerage'] == 0))]
+                
                 print("Removed rows where both 'Premium' and 'Brokerage' are 0.")
             else:
                 print("'Premium' or 'Brokerage' column not in processed data.")
@@ -14214,7 +14214,7 @@ def process_aditya_insurance_co(file_path, template_data, risk_code_data, cust_n
             # Remove rows where both 'Premium' and 'Brokerage' are 0
             if 'Premium' in processed_df.columns and 'Brokerage' in processed_df.columns:
                 processed_df[['Premium', 'Brokerage']] = processed_df[['Premium', 'Brokerage']].apply(pd.to_numeric, errors='coerce').fillna(0)
-                processed_df = processed_df[~((processed_df['Premium'] == 0) & (processed_df['Brokerage'] == 0))]
+                
                 print("Removed rows where both 'Premium' and 'Brokerage' are 0.")
             else:
                 print("'Premium' or 'Brokerage' column not in processed data.")
@@ -16063,7 +16063,7 @@ def process_iffco_tokyo_insurer(file_path, template_data, risk_code_data, cust_n
             # Remove rows where both 'Premium' and 'Brokerage' are 0
             if 'Premium' in processed_df.columns and 'Brokerage' in processed_df.columns:
                 processed_df[['Premium', 'Brokerage']] = processed_df[['Premium', 'Brokerage']].apply(pd.to_numeric, errors='coerce').fillna(0)
-                processed_df = processed_df[~((processed_df['Premium'] == 0) & (processed_df['Brokerage'] == 0))]
+                
                 print("Removed rows where both 'Premium' and 'Brokerage' are 0.")
             else:
                 print("'Premium' or 'Brokerage' column not in processed data.")
@@ -16617,7 +16617,7 @@ def process_max_life_insurance(file_path, template_data, risk_code_data, cust_ne
             # Remove rows where both 'Premium' and 'Brokerage' are 0
             if 'Premium' in processed_df.columns and 'Brokerage' in processed_df.columns:
                 processed_df[['Premium', 'Brokerage']] = processed_df[['Premium', 'Brokerage']].apply(pd.to_numeric, errors='coerce').fillna(0)
-                processed_df = processed_df[~((processed_df['Premium'] == 0) & (processed_df['Brokerage'] == 0))]
+                
                 print("Removed rows where both 'Premium' and 'Brokerage' are 0.")
             else:
                 print("'Premium' or 'Brokerage' column not in processed data.")
@@ -18412,7 +18412,7 @@ def process_pramerica_life_insurance(file_path, template_data, risk_code_data, c
             # Remove rows where both 'Premium' and 'Brokerage' are 0
             if 'Premium' in processed_df.columns and 'Brokerage' in processed_df.columns:
                 processed_df[['Premium', 'Brokerage']] = processed_df[['Premium', 'Brokerage']].apply(pd.to_numeric, errors='coerce').fillna(0)
-                processed_df = processed_df[~((processed_df['Premium'] == 0) & (processed_df['Brokerage'] == 0))]
+                
                 print("Removed rows where both 'Premium' and 'Brokerage' are 0.")
             else:
                 print("'Premium' or 'Brokerage' column not in processed data.")
@@ -18984,7 +18984,7 @@ def process_pnb_metlife_insurance(file_path, template_data, risk_code_data, cust
             # Remove rows where both 'Premium' and 'Brokerage' are 0
             if 'Premium' in processed_df.columns and 'Brokerage' in processed_df.columns:
                 processed_df[['Premium', 'Brokerage']] = processed_df[['Premium', 'Brokerage']].apply(pd.to_numeric, errors='coerce').fillna(0)
-                processed_df = processed_df[~((processed_df['Premium'] == 0) & (processed_df['Brokerage'] == 0))]
+                
                 print("Removed rows where both 'Premium' and 'Brokerage' are 0.")
             else:
                 print("'Premium' or 'Brokerage' column not in processed data.")
